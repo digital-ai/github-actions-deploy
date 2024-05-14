@@ -1,25 +1,20 @@
 const core = require('@actions/core');
 const axios = require('axios');
-const fs = require('fs');
-const { parseString } = require('xml2js');
+const Archive = require('./archive');
+
 
 async function run() {
   try {
     // Get inputs
     let manifestPath = core.getInput('manifestPath');
 
-    // Read XML file
-    const xmlData = fs.readFileSync(manifestPath, 'utf8');
-
-    // Parse XML to JavaScript object
-    parseString(xmlData, (err, result) => {
-      if (err) {
-        throw new Error(`Error parsing XML: ${err.message}`);
-      }
-
-      // Print parsed XML content
-      console.log(JSON.stringify(result, null, 2));
+    Archive.CreateNewDarPackage(manifestPath, "output", "mydar")
+    .then(packagePath => console.log("Package created at:", packagePath))
+    .catch(error => {
+        console.error("Error creating package:", error);
+        throw error; // Throw the error for further handling
     });
+
   } catch (error) {
     // Handle errors
     core.setFailed(error.message);
