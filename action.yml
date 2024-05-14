@@ -1,0 +1,16 @@
+name: Create and Deploy Package on Digital.ai Deploy
+
+description: |
+  This GitHub Action enables the creation of a new pakage and deploy it on the Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, automating deploy management processes.
+
+inputs:
+  manifestPath:
+    description: 'The path of the deployit-manifest.xml file.'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+author:
+  name: 'Digital.ai'

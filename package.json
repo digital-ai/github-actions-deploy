@@ -1,0 +1,61 @@
+{
+  "name": "github-actions-deploy",
+  "version": "1.0.0",
+  "description": "The GitHub Actions for Digital.ai Deploy",
+  "homepage": "https://github.com/digital-ai/github-actions-deploy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/digital-ai/github-actions-deploy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/digital-ai/github-actions-deploy/issues"
+  },
+  "scripts": {
+    "package": "npx ncc build src/index.js -o dist --source-map --license licenses.txt",
+    "test": "npx jest",
+    "all": "npm run test && npm run package"
+  },
+  "keywords": [
+    "Digital.ai Deploy",
+    "GitHub",
+    "Actions",
+    "JavaScript"
+  ],
+  "author": "Digital.ai",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@actions/core": "^1.10.1",
+    "@jest/core": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "axios": "^1.6.8",
+    "jest": "^29.7.0",
+    "xml2js": "^0.6.2"
+  },
+  "jest": {
+    "verbose": true,
+    "clearMocks": true,
+    "testEnvironment": "node",
+    "moduleFileExtensions": [
+      "js"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "coverageReporters": [
+      "json-summary",
+      "text",
+      "lcov"
+    ],
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "./src/**"
+    ]
+  }
+}
