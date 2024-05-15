@@ -64055,7 +64055,7 @@ const path = __nccwpck_require__(1017);
 const xml2js = __nccwpck_require__(7486);
 
 class Archive {
-    
+
     static async GetPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
@@ -64089,47 +64089,56 @@ class Archive {
     }
 
     static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
-        const rootPath = process.cwd()
+        try {
 
-        console.log(`rootPath = ${rootPath}`);
-        console.log(`manifestPath = ${manifestPath}`);
-        console.log(`outputPath = ${outputPath}`);
-        console.log(`packageName = ${packageName}`);
+            const rootPath = process.cwd()
+            console.log(`rootPath = ${rootPath}`);
+            console.log(`manifestPath = ${manifestPath}`);
+            console.log(`outputPath = ${outputPath}`);
+            console.log(`packageName = ${packageName}`);
 
-        const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
+            const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
-        if (fs.existsSync(manifestFileFullPath)) {
-            console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+            if (fs.existsSync(manifestFileFullPath)) {
+                console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+            }
+
+            fs.copyFileSync(manifestPath, manifestFileFullPath);
+
+            const outputFullPath = path.join(process.cwd(), outputPath)
+
+            if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
+                console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
+                fs.mkdirSync(outputFullPath, { recursive: true });
+            }
+
+            if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
+                packageName = packageName + ".dar";
+            } else {
+                packageName = "package.dar";
+            }
+
+            const packageFullPath = path.join(outputFullPath, packageName);
+
+            console.log(`Package path set: ${packageFullPath}`);
+
+            if (fs.existsSync(packageFullPath)) {
+                throw new Error(`A DAR package already exists at ${packageFullPath}.`);
+            }
+
+            const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
+            console.log(`filesToInclude = ${filesToInclude}`);
+            
+            await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
+            console.log("Package created at:", packageFullPath);
+            
+            return packageFullPath
+
+        } catch (error) {
+            console.error("Error creating package:", error);
+            throw error;
         }
-    
-        fs.copyFileSync(manifestPath, manifestFileFullPath);
 
-        const outputFullPath = path.join(process.cwd(), outputPath)
-
-        if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
-            console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
-            fs.mkdirSync(outputFullPath, { recursive: true });
-        }
-
-        if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
-            packageName = packageName + ".dar";
-        } else {
-            packageName = "package.dar";
-        }
-
-        const packageFullPath = path.join(outputFullPath, packageName);
-
-        console.log(`Package path set: ${packageFullPath}`);
-
-        if (fs.existsSync(packageFullPath)) {
-            throw new Error(`A DAR package already exists at ${packageFullPath}.`);
-        }
-
-        const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
-
-        console.log(`filesToInclude = ${filesToInclude}`);
-
-        return await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
     }
 
     static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
@@ -64151,11 +64160,8 @@ class Archive {
         await new Promise((resolve, reject) => {
             output.on("close", resolve);
             archive.on("error", reject);
-
             archive.finalize();
         });
-
-        return packageFullPath;
     }
 }
 
@@ -64168,21 +64174,78 @@ module.exports = Archive;
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const core = __nccwpck_require__(8629);
-const axios = __nccwpck_require__(6342);
 const Archive = __nccwpck_require__(3575);
+const PackageManager = __nccwpck_require__(8996);
 
+
+async function createNewPackage(manifestPath, darPath, packageName) {
+  return await Archive.CreateNewDarPackage(manifestPath, darPath, packageName);
+
+}
+
+async function publishPackage(serverUrl, username, password, packageFullPath) {
+  return await PackageManager.publishPackage(serverUrl, username, password, packageFullPath);
+
+}
 
 async function run() {
   try {
-    // Get inputs
-    let manifestPath = core.getInput('manifestPath');
+    // Read all inputs 
+    const action = core.getInput('action');
+    const serverUrl = core.getInput('serverUrl');
+    const username = core.getInput('username');
+    const password = core.getInput('password');
+    const manifestPath = core.getInput('manifestPath');
+    const darPath = core.getInput('darPath');
+    const packageName = core.getInput('packageName');
+    const existingDarPath = core.getInput('existingDarPath');
+    const packageId = core.getInput('packageId');
+    const environmentId = core.getInput('environmentId');
 
-    Archive.CreateNewDarPackage(manifestPath, "output", "mydar")
-    .then(packagePath => console.log("Package created at:", packagePath))
-    .catch(error => {
-        console.error("Error creating package:", error);
-        throw error; // Throw the error for further handling
-    });
+    // Assign default value for action
+    const defaultAction = 'create_publish_deploy';
+    const selectedAction = action || defaultAction;
+
+    // Check action and validate inputs accordingly
+    if (selectedAction === 'create') {
+      
+      if (!manifestPath || !darPath) {
+        throw new Error("manifestPath and darPath are required for 'create' action.");
+      }
+      await createNewPackage(manifestPath, darPath, packageName);
+
+    } else if (selectedAction === 'create_publish') {
+      
+      if (!manifestPath || !darPath || !serverUrl || !username || !password) {
+        throw new Error("serverUrl, username, password, manifestPath and darPath are required for 'create_publish' action.");
+      }
+
+      const packageFullPath = await createNewPackage(manifestPath, darPath, packageName);
+
+      publishPackage(serverUrl, username, password, packageFullPath)
+
+
+    } else if (selectedAction === 'create_publish_deploy') {
+      
+      if (!manifestPath || !darPath || !serverUrl || !username || !password || !packageId || !environmentId) {
+        throw new Error("manifestPath, darPath, serverUrl, username, password, packageId, and environmentId are required for 'create_publish_deploy' action.");
+      }
+
+    } else if (selectedAction === 'publish') {
+      
+      if (!existingDarPath || !serverUrl || !username || !password) {
+        throw new Error("existingDarPath, serverUrl, username, and password are required for 'publish' action.");
+      }
+
+    } else if (selectedAction === 'publish_deploy') {
+      
+      if (!existingDarPath || !serverUrl || !username || !password || !packageId || !environmentId) {
+        throw new Error("existingDarPath, serverUrl, username, password, packageId, and environmentId are required for 'publish_deploy' action.");
+      }
+
+    } else {
+      throw new Error(`Invalid action: ${selectedAction}. Supported actions are: create, create_publish, create_publish_deploy, publish, publish_deploy.`);
+    }
 
   } catch (error) {
     // Handle errors
@@ -64195,6 +64258,51 @@ module.exports = {
 }
 
 run();
+
+/***/ }),
+
+/***/ 8996:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const axios = __nccwpck_require__(6342);
+const fs = __nccwpck_require__(7147);
+const path = __nccwpck_require__(1017);
+
+class PackageManager {
+
+  static async publishPackage(serverUrl, username, password, packageFullPath) {
+    
+    const packageName = path.basename(packageFullPath);
+
+    try {
+
+      const fileData = fs.readFileSync(packageFullPath);
+      const formData = new FormData();
+      const blob = new Blob([fileData], { type: 'application/octet-stream' });
+      formData.append('fileData', blob, packageName);
+
+      const response = await axios.post(`${serverUrl}/deployit/package/upload/${packageName}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        auth: {
+          username,
+          password
+        }
+      });
+
+      console.log(`Package ${packageName} published successfully!`);
+      return response.data;
+      
+    } catch (error) {
+      console.error(`Error publishing package ${packageName}:`, error);
+      throw error;
+    }
+  }
+}
+
+module.exports = PackageManager;
+
 
 /***/ }),
 

@@ -4,7 +4,7 @@ const path = require("path");
 const xml2js = require("xml2js");
 
 class Archive {
-    
+
     static async GetPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
@@ -38,47 +38,56 @@ class Archive {
     }
 
     static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
-        const rootPath = process.cwd()
+        try {
 
-        console.log(`rootPath = ${rootPath}`);
-        console.log(`manifestPath = ${manifestPath}`);
-        console.log(`outputPath = ${outputPath}`);
-        console.log(`packageName = ${packageName}`);
+            const rootPath = process.cwd()
+            console.log(`rootPath = ${rootPath}`);
+            console.log(`manifestPath = ${manifestPath}`);
+            console.log(`outputPath = ${outputPath}`);
+            console.log(`packageName = ${packageName}`);
 
-        const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
+            const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
-        if (fs.existsSync(manifestFileFullPath)) {
-            console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+            if (fs.existsSync(manifestFileFullPath)) {
+                console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+            }
+
+            fs.copyFileSync(manifestPath, manifestFileFullPath);
+
+            const outputFullPath = path.join(process.cwd(), outputPath)
+
+            if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
+                console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
+                fs.mkdirSync(outputFullPath, { recursive: true });
+            }
+
+            if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
+                packageName = packageName + ".dar";
+            } else {
+                packageName = "package.dar";
+            }
+
+            const packageFullPath = path.join(outputFullPath, packageName);
+
+            console.log(`Package path set: ${packageFullPath}`);
+
+            if (fs.existsSync(packageFullPath)) {
+                throw new Error(`A DAR package already exists at ${packageFullPath}.`);
+            }
+
+            const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
+            console.log(`filesToInclude = ${filesToInclude}`);
+            
+            await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
+            console.log("Package created at:", packageFullPath);
+            
+            return packageFullPath
+
+        } catch (error) {
+            console.error("Error creating package:", error);
+            throw error;
         }
-    
-        fs.copyFileSync(manifestPath, manifestFileFullPath);
 
-        const outputFullPath = path.join(process.cwd(), outputPath)
-
-        if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
-            console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
-            fs.mkdirSync(outputFullPath, { recursive: true });
-        }
-
-        if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
-            packageName = packageName + ".dar";
-        } else {
-            packageName = "package.dar";
-        }
-
-        const packageFullPath = path.join(outputFullPath, packageName);
-
-        console.log(`Package path set: ${packageFullPath}`);
-
-        if (fs.existsSync(packageFullPath)) {
-            throw new Error(`A DAR package already exists at ${packageFullPath}.`);
-        }
-
-        const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
-
-        console.log(`filesToInclude = ${filesToInclude}`);
-
-        return await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
     }
 
     static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
@@ -100,11 +109,8 @@ class Archive {
         await new Promise((resolve, reject) => {
             output.on("close", resolve);
             archive.on("error", reject);
-
             archive.finalize();
         });
-
-        return packageFullPath;
     }
 }
 
