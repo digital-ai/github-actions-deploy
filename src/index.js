@@ -10,8 +10,8 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (!manifestPath.endsWith(".xml")) {
     throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
   }
+  
   const manifestFullPath = path.join(process.cwd(), manifestPath);
-
   if (!fs.existsSync(manifestFullPath)) {
     throw new Error("manifest file does not exist.");
   }
@@ -20,8 +20,8 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (versionNumber) {
     Util.SetVersion(manifestFullPath, versionNumber);
   }
-
   return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
+
 }
 
 async function publishPackage(packageFullPath) {
@@ -33,8 +33,11 @@ async function publishPackage(packageFullPath) {
   if (!fs.existsSync(packageFullPath)) {
     throw new Error("package dar file does not exist.");
   }
-
   return DeployManager.publishPackage(packageFullPath);
+}
+
+async function deployPackage(packageFullPath, targetEnvironment, rollback) {
+  return DeployManager.deployPackage(packageFullPath, targetEnvironment, rollback);
 }
 
 async function run() {
@@ -65,6 +68,13 @@ async function run() {
 
     DeployManager.serverConfig = serverConfig;
 
+    const serverState = await DeployManager.getServerState();
+    if (serverState !== "RUNNING") {
+      throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
+    }else{
+      console.log('Digital.ai Deploy server is running and credentials are validated.');
+    }
+
     const validateInputs = (requiredInputs) => {
       requiredInputs.forEach(input => {
         if (!core.getInput(input)) {
@@ -84,14 +94,14 @@ async function run() {
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePath);
         await publishPackage(packageFullPath);
-        // Add deployment logic here if needed
+        await deployPackage(packageFullPath, environmentId, rollback);
         break;
 
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         await publishPackage(packageFullPath);
-        // Add deployment logic here if needed
+        await deployPackage(packageFullPath, environmentId, rollback);
         break;
 
       default:
