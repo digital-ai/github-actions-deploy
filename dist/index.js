@@ -64173,8 +64173,11 @@ const path = __nccwpck_require__(1017);
 
 class DeployManager {
 
-  static async apiRequest(serverConfig, endpoint, method, data, headers) {
-    const { url, username, password } = serverConfig;
+  static serverConfig;
+
+  static async apiRequest(endpoint, method, data, headers) {
+
+    const { url, username, password } = DeployManager.serverConfig;
     try {
       const response = await axios({
         url: `${url}${endpoint}`,
@@ -64193,20 +64196,22 @@ class DeployManager {
     }
   }
 
-  static async publishPackage(serverConfig, packageFullPath) {
+  static async publishPackage(packageFullPath) {
+
     const packageName = path.basename(packageFullPath);
+
     try {
       const fileData = fs.readFileSync(packageFullPath);
       const formData = new FormData();
       const blob = new Blob([fileData], { type: 'application/octet-stream' });
       formData.append('fileData', blob, packageName);
 
-      const headers = {'Content-Type': 'multipart/form-data'};
+      const headers = { 'Content-Type': 'multipart/form-data' };
 
       const endpoint = `/deployit/package/upload/${packageName}`;
       const method = 'POST';
 
-      const response = await DeployManager.apiRequest(serverConfig, endpoint, method, formData, headers);
+      const response = await DeployManager.apiRequest(endpoint, method, formData, headers);
 
       console.log(`Package ${packageName} published successfully!`);
       return response;
@@ -64229,22 +64234,41 @@ module.exports = DeployManager;
 
 const core = __nccwpck_require__(8629);
 const path = __nccwpck_require__(1017);
+const fs = __nccwpck_require__(7147);
 const Archive = __nccwpck_require__(3575);
 const DeployManager = __nccwpck_require__(2280);
 const Util = __nccwpck_require__(7621);
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
 
+  if (!manifestPath.endsWith(".xml")) {
+    throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
+  }
   const manifestFullPath = path.join(process.cwd(), manifestPath);
+
+  if (!fs.existsSync(manifestFullPath)) {
+    throw new Error("manifest file does not exist.");
+  }
+
   const outputFullPath = path.join(process.cwd(), outputPath);
-  if (versionNumber){
+  if (versionNumber) {
     Util.SetVersion(manifestFullPath, versionNumber);
   }
+
   return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
-async function publishPackage(serverConfig, packageFullPath) {
-  return DeployManager.publishPackage(serverConfig, packageFullPath);
+async function publishPackage(packageFullPath) {
+
+  if (!packageFullPath.endsWith(".dar")) {
+    throw new Error("Invalid package path: the path must have a '.dar' extension.");
+  }
+
+  if (!fs.existsSync(packageFullPath)) {
+    throw new Error("package dar file does not exist.");
+  }
+
+  return DeployManager.publishPackage(packageFullPath);
 }
 
 async function run() {
@@ -64273,6 +64297,8 @@ async function run() {
       password: password
     };
 
+    DeployManager.serverConfig = serverConfig;
+
     const validateInputs = (requiredInputs) => {
       requiredInputs.forEach(input => {
         if (!core.getInput(input)) {
@@ -64285,20 +64311,20 @@ async function run() {
       case 'create_publish':
         validateInputs(['manifestPath', 'outputPath']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         break;
 
       case 'publish_deploy':
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePath);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         // Add deployment logic here if needed
         break;
 
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         // Add deployment logic here if needed
         break;
 
@@ -64415,7 +64441,7 @@ class Util {
             });
         });
     }
-    
+
 }
 
 module.exports = Util;

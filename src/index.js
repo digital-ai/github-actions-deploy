@@ -1,21 +1,40 @@
 const core = require('@actions/core');
 const path = require("path");
+const fs = require("fs");
 const Archive = require('./archive');
 const DeployManager = require('./deploy-manager');
 const Util = require('./util');
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
 
+  if (!manifestPath.endsWith(".xml")) {
+    throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
+  }
   const manifestFullPath = path.join(process.cwd(), manifestPath);
+
+  if (!fs.existsSync(manifestFullPath)) {
+    throw new Error("manifest file does not exist.");
+  }
+
   const outputFullPath = path.join(process.cwd(), outputPath);
-  if (versionNumber){
+  if (versionNumber) {
     Util.SetVersion(manifestFullPath, versionNumber);
   }
+
   return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
-async function publishPackage(serverConfig, packageFullPath) {
-  return DeployManager.publishPackage(serverConfig, packageFullPath);
+async function publishPackage(packageFullPath) {
+
+  if (!packageFullPath.endsWith(".dar")) {
+    throw new Error("Invalid package path: the path must have a '.dar' extension.");
+  }
+
+  if (!fs.existsSync(packageFullPath)) {
+    throw new Error("package dar file does not exist.");
+  }
+
+  return DeployManager.publishPackage(packageFullPath);
 }
 
 async function run() {
@@ -44,6 +63,8 @@ async function run() {
       password: password
     };
 
+    DeployManager.serverConfig = serverConfig;
+
     const validateInputs = (requiredInputs) => {
       requiredInputs.forEach(input => {
         if (!core.getInput(input)) {
@@ -56,20 +77,20 @@ async function run() {
       case 'create_publish':
         validateInputs(['manifestPath', 'outputPath']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         break;
 
       case 'publish_deploy':
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePath);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         // Add deployment logic here if needed
         break;
 
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(serverConfig, packageFullPath);
+        await publishPackage(packageFullPath);
         // Add deployment logic here if needed
         break;
 
