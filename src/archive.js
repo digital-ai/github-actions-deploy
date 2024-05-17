@@ -41,24 +41,18 @@ class Archive {
         try {
 
             const rootPath = process.cwd()
-            console.log(`rootPath = ${rootPath}`);
-            console.log(`manifestPath = ${manifestPath}`);
-            console.log(`outputPath = ${outputPath}`);
-            console.log(`packageName = ${packageName}`);
 
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
             if (fs.existsSync(manifestFileFullPath)) {
-                console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+                //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
             }
 
             fs.copyFileSync(manifestPath, manifestFileFullPath);
 
-            const outputFullPath = path.join(process.cwd(), outputPath)
-
-            if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
-                console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
-                fs.mkdirSync(outputFullPath, { recursive: true });
+            if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
+                console.log(`Output path not found, creating folder structure: ${outputPath}`);
+                fs.mkdirSync(outputPath, { recursive: true });
             }
 
             if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
@@ -67,7 +61,7 @@ class Archive {
                 packageName = "package.dar";
             }
 
-            const packageFullPath = path.join(outputFullPath, packageName);
+            var packageFullPath = path.join(outputPath, packageName);
 
             console.log(`Package path set: ${packageFullPath}`);
 
@@ -76,7 +70,7 @@ class Archive {
             }
 
             const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
-            console.log(`filesToInclude = ${filesToInclude}`);
+            console.log(`Files to include in the package = ${filesToInclude}`);
             
             await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);

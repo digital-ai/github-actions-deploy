@@ -64092,24 +64092,18 @@ class Archive {
         try {
 
             const rootPath = process.cwd()
-            console.log(`rootPath = ${rootPath}`);
-            console.log(`manifestPath = ${manifestPath}`);
-            console.log(`outputPath = ${outputPath}`);
-            console.log(`packageName = ${packageName}`);
 
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
             if (fs.existsSync(manifestFileFullPath)) {
-                console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+                //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
             }
 
             fs.copyFileSync(manifestPath, manifestFileFullPath);
 
-            const outputFullPath = path.join(process.cwd(), outputPath)
-
-            if (path.isAbsolute(outputFullPath) && !fs.existsSync(outputFullPath)) {
-                console.log(`Output path not found, creating folder structure: ${outputFullPath}`);
-                fs.mkdirSync(outputFullPath, { recursive: true });
+            if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
+                console.log(`Output path not found, creating folder structure: ${outputPath}`);
+                fs.mkdirSync(outputPath, { recursive: true });
             }
 
             if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
@@ -64118,7 +64112,7 @@ class Archive {
                 packageName = "package.dar";
             }
 
-            const packageFullPath = path.join(outputFullPath, packageName);
+            var packageFullPath = path.join(outputPath, packageName);
 
             console.log(`Package path set: ${packageFullPath}`);
 
@@ -64127,7 +64121,7 @@ class Archive {
             }
 
             const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
-            console.log(`filesToInclude = ${filesToInclude}`);
+            console.log(`Files to include in the package = ${filesToInclude}`);
             
             await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
@@ -64170,138 +64164,261 @@ module.exports = Archive;
 
 /***/ }),
 
-/***/ 6625:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(8629);
-const Archive = __nccwpck_require__(3575);
-const PackageManager = __nccwpck_require__(8996);
-
-
-async function createNewPackage(manifestPath, darPath, packageName) {
-  return await Archive.CreateNewDarPackage(manifestPath, darPath, packageName);
-
-}
-
-async function publishPackage(serverUrl, username, password, packageFullPath) {
-  return await PackageManager.publishPackage(serverUrl, username, password, packageFullPath);
-
-}
-
-async function run() {
-  try {
-    // Read all inputs 
-    const action = core.getInput('action');
-    const serverUrl = core.getInput('serverUrl');
-    const username = core.getInput('username');
-    const password = core.getInput('password');
-    const manifestPath = core.getInput('manifestPath');
-    const darPath = core.getInput('darPath');
-    const packageName = core.getInput('packageName');
-    const existingDarPath = core.getInput('existingDarPath');
-    const packageId = core.getInput('packageId');
-    const environmentId = core.getInput('environmentId');
-
-    // Assign default value for action
-    const defaultAction = 'create_publish_deploy';
-    const selectedAction = action || defaultAction;
-
-    // Check action and validate inputs accordingly
-    if (selectedAction === 'create') {
-      
-      if (!manifestPath || !darPath) {
-        throw new Error("manifestPath and darPath are required for 'create' action.");
-      }
-      await createNewPackage(manifestPath, darPath, packageName);
-
-    } else if (selectedAction === 'create_publish') {
-      
-      if (!manifestPath || !darPath || !serverUrl || !username || !password) {
-        throw new Error("serverUrl, username, password, manifestPath and darPath are required for 'create_publish' action.");
-      }
-
-      const packageFullPath = await createNewPackage(manifestPath, darPath, packageName);
-
-      publishPackage(serverUrl, username, password, packageFullPath)
-
-
-    } else if (selectedAction === 'create_publish_deploy') {
-      
-      if (!manifestPath || !darPath || !serverUrl || !username || !password || !packageId || !environmentId) {
-        throw new Error("manifestPath, darPath, serverUrl, username, password, packageId, and environmentId are required for 'create_publish_deploy' action.");
-      }
-
-    } else if (selectedAction === 'publish') {
-      
-      if (!existingDarPath || !serverUrl || !username || !password) {
-        throw new Error("existingDarPath, serverUrl, username, and password are required for 'publish' action.");
-      }
-
-    } else if (selectedAction === 'publish_deploy') {
-      
-      if (!existingDarPath || !serverUrl || !username || !password || !packageId || !environmentId) {
-        throw new Error("existingDarPath, serverUrl, username, password, packageId, and environmentId are required for 'publish_deploy' action.");
-      }
-
-    } else {
-      throw new Error(`Invalid action: ${selectedAction}. Supported actions are: create, create_publish, create_publish_deploy, publish, publish_deploy.`);
-    }
-
-  } catch (error) {
-    // Handle errors
-    core.setFailed(error.message);
-  }
-}
-
-module.exports = {
-  run
-}
-
-run();
-
-/***/ }),
-
-/***/ 8996:
+/***/ 2280:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const axios = __nccwpck_require__(6342);
 const fs = __nccwpck_require__(7147);
 const path = __nccwpck_require__(1017);
 
-class PackageManager {
+class DeployManager {
 
-  static async publishPackage(serverUrl, username, password, packageFullPath) {
-    
-    const packageName = path.basename(packageFullPath);
-
+  static async apiRequest(serverConfig, endpoint, method, data, headers) {
+    const { url, username, password } = serverConfig;
     try {
+      const response = await axios({
+        url: `${url}${endpoint}`,
+        method,
+        headers,
+        auth: {
+          username,
+          password
+        },
+        data
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error with ${method.toUpperCase()} request to ${endpoint}:`, error);
+      throw error;
+    }
+  }
 
+  static async publishPackage(serverConfig, packageFullPath) {
+    const packageName = path.basename(packageFullPath);
+    try {
       const fileData = fs.readFileSync(packageFullPath);
       const formData = new FormData();
       const blob = new Blob([fileData], { type: 'application/octet-stream' });
       formData.append('fileData', blob, packageName);
 
-      const response = await axios.post(`${serverUrl}/deployit/package/upload/${packageName}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        auth: {
-          username,
-          password
-        }
-      });
+      const headers = {'Content-Type': 'multipart/form-data'};
+
+      const endpoint = `/deployit/package/upload/${packageName}`;
+      const method = 'POST';
+
+      const response = await DeployManager.apiRequest(serverConfig, endpoint, method, formData, headers);
 
       console.log(`Package ${packageName} published successfully!`);
-      return response.data;
-      
+      return response;
+
     } catch (error) {
       console.error(`Error publishing package ${packageName}:`, error);
       throw error;
     }
   }
+
 }
 
-module.exports = PackageManager;
+module.exports = DeployManager;
+
+
+/***/ }),
+
+/***/ 6625:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(8629);
+const path = __nccwpck_require__(1017);
+const Archive = __nccwpck_require__(3575);
+const DeployManager = __nccwpck_require__(2280);
+const Util = __nccwpck_require__(7621);
+
+async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
+
+  const manifestFullPath = path.join(process.cwd(), manifestPath);
+  const outputFullPath = path.join(process.cwd(), outputPath);
+  if (versionNumber){
+    Util.SetVersion(manifestFullPath, versionNumber);
+  }
+  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
+}
+
+async function publishPackage(serverConfig, packageFullPath) {
+  return DeployManager.publishPackage(serverConfig, packageFullPath);
+}
+
+async function run() {
+  try {
+    // Read all inputs
+    const action = core.getInput('action') || 'create_publish_deploy';
+    const serverUrl = core.getInput('serverUrl').replace(/\/$/, ''); // Remove trailing '/'
+    const username = core.getInput('username');
+    const password = core.getInput('password');
+    const manifestPath = core.getInput('manifestPath');
+    const outputPath = core.getInput('outputPath');
+    const packageName = core.getInput('packageName');
+    const versionNumber = core.getInput('versionNumber');
+    const darPackagePath = core.getInput('darPackagePath');
+    const environmentId = core.getInput('environmentId');
+    const rollback = core.getInput('rollback');
+    var packageFullPath = '';
+
+    if (!serverUrl || !username || !password) {
+      throw new Error('serverUrl, username, and password are required.');
+    }
+
+    const serverConfig = {
+      url: serverUrl,
+      username: username,
+      password: password
+    };
+
+    const validateInputs = (requiredInputs) => {
+      requiredInputs.forEach(input => {
+        if (!core.getInput(input)) {
+          throw new Error(`${input} is required for action '${action}'.`);
+        }
+      });
+    };
+
+    switch (action) {
+      case 'create_publish':
+        validateInputs(['manifestPath', 'outputPath']);
+        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        await publishPackage(serverConfig, packageFullPath);
+        break;
+
+      case 'publish_deploy':
+        validateInputs(['darPackagePath', 'environmentId']);
+        packageFullPath = path.join(process.cwd(), darPackagePath);
+        await publishPackage(serverConfig, packageFullPath);
+        // Add deployment logic here if needed
+        break;
+
+      case 'create_publish_deploy':
+        validateInputs(['manifestPath', 'outputPath', 'environmentId']);
+        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        await publishPackage(serverConfig, packageFullPath);
+        // Add deployment logic here if needed
+        break;
+
+      default:
+        throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, create_publish_deploy.`);
+    }
+
+  } catch (error) {
+    core.setFailed(error.message);
+  }
+}
+
+module.exports = {
+  run
+};
+
+run();
+
+
+/***/ }),
+
+/***/ 7621:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const fs = __nccwpck_require__(7147);
+const xml2js = __nccwpck_require__(7486);
+
+class Util {
+
+    static async GetVersionFromManifest(manifestPath) {
+        const text = fs.readFileSync(manifestPath, "utf8");
+        return await Util.GetVersion(text);
+    }
+
+    static async GetVersion(manifest) {
+        const xml = await this.xml2json(manifest);
+
+        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
+        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
+
+        if (udmDeploymentPackageElement) {
+            return udmDeploymentPackageElement.$.version;
+        } else if (udmProvisioningPackageElement) {
+            return udmProvisioningPackageElement.$.version;
+        } else {
+            throw new Error("Content is not a valid manifest content.");
+        }
+    }
+
+    static StartsWith(inputString, value, ignoreCase) {
+        const subString = inputString.substring(0, value.length);
+
+        if (ignoreCase) {
+            return subString.toLowerCase() === value.toLowerCase();
+        } else {
+            return subString === value;
+        }
+    }
+
+    static async SetVersion(manifestPath, version) {
+        const text = fs.readFileSync(manifestPath, "utf8");
+        const xml = await this.xml2json(text);
+
+        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
+        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
+
+        if (udmDeploymentPackageElement) {
+            udmDeploymentPackageElement.$.version = version;
+        } else if (udmProvisioningPackageElement) {
+            udmProvisioningPackageElement.$.version = version;
+        } else {
+            throw new Error(`${manifestPath} is not a valid manifest file.`);
+        }
+
+        const builder = new xml2js.Builder();
+
+        fs.writeFileSync(manifestPath, builder.buildObject(xml), "utf8");
+    }
+
+    static async GetApplicationFromManifest(manifestPath) {
+        const manifest = fs.readFileSync(manifestPath, "utf8");
+        return await Util.GetApplication(manifest);
+    }
+
+    static async GetApplication(manifest) {
+        const xml = await this.xml2json(manifest);
+
+        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
+        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
+
+        if (udmDeploymentPackageElement) {
+            return udmDeploymentPackageElement.$.application.trim();
+        } else if (udmProvisioningPackageElement) {
+            return udmProvisioningPackageElement.$.application.trim();
+        } else {
+            throw new Error(`Content is not a valid manifest content.`);
+        }
+    }
+
+    static async GetApplicationNameFromManifest(manifestPath) {
+        const application = await this.GetApplicationFromManifest(manifestPath);
+        const splitPath = application.split("/");
+        return splitPath[splitPath.length - 1];
+    }
+
+    static async xml2json(xml) {
+        return new Promise((resolve, reject) => {
+            xml2js.parseString(xml, { explicitArray: false }, (err, json) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(json);
+                }
+            });
+        });
+    }
+    
+}
+
+module.exports = Util;
 
 
 /***/ }),
