@@ -54,7 +54,8 @@ class Archive {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
             }
-
+            console.log("Given Package Name :");
+            console.log(packageName);
             if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
                 packageName = packageName + ".dar";
             } else {
