@@ -65473,7 +65473,7 @@ class DeployManager {
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
-      if (!rollback) {
+      if (rollback === 'false') {
         throw new Error("Deployment failed");
       }
 
@@ -65706,7 +65706,7 @@ async function run() {
     const versionNumber = core.getInput('versionNumber');
     const darPackagePath = core.getInput('darPackagePath');
     const environmentId = core.getInput('environmentId');
-    const rollback = core.getInput('rollback');
+    const rollback = core.getInput('rollback') || 'false';
     let packageFullPath = '';
 
     if (!serverUrl || !username || !password) {

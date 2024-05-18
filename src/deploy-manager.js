@@ -88,7 +88,7 @@ class DeployManager {
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
-      if (!rollback) {
+      if (rollback === 'false') {
         throw new Error("Deployment failed");
       }
 
