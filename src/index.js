@@ -56,9 +56,6 @@ async function run() {
     const rollback = core.getInput('rollback');
     var packageFullPath = '';
 
-    console.log("Given Package Name :");
-    console.log(packageName);
-
     if (!serverUrl || !username || !password) {
       throw new Error('serverUrl, username, and password are required.');
     }

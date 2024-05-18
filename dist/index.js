@@ -65322,12 +65322,11 @@ class Archive {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
             }
-            console.log("Given Package Name :");
-            console.log(packageName);
-            if (packageName && !packageName.toLowerCase().endsWith(".dar")) {
-                packageName = packageName + ".dar";
-            } else {
+
+            if (!packageName) {
                 packageName = "package.dar";
+            } else if (!packageName.toLowerCase().endsWith(".dar")) {
+                packageName = packageName + ".dar";
             }
 
             var packageFullPath = path.join(outputPath, packageName);
@@ -65340,10 +65339,10 @@ class Archive {
 
             const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
             console.log(`Files to include in the package = ${filesToInclude}`);
-            
+
             await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
-            
+
             return packageFullPath
 
         } catch (error) {
@@ -65703,9 +65702,6 @@ async function run() {
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback');
     var packageFullPath = '';
-
-    console.log("Given Package Name :");
-    console.log(packageName);
 
     if (!serverUrl || !username || !password) {
       throw new Error('serverUrl, username, and password are required.');
