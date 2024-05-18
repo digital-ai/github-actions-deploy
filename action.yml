@@ -33,7 +33,7 @@ inputs:
   darPackagePath:
     description: 'The path to the DAR package.'
     required: false
-  targetEnvironmentId:
+  environmentId:
     description: 'ID of the target environment in Digital.ai Deploy.'
     required: false
   rollback:
