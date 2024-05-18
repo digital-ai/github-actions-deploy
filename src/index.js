@@ -6,11 +6,10 @@ const DeployManager = require('./deploy-manager');
 const Util = require('./util');
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
-
   if (!manifestPath.endsWith(".xml")) {
     throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
   }
-  
+
   const manifestFullPath = path.join(process.cwd(), manifestPath);
   if (!fs.existsSync(manifestFullPath)) {
     throw new Error("manifest file does not exist.");
@@ -20,12 +19,11 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (versionNumber) {
     Util.SetVersion(manifestFullPath, versionNumber);
   }
-  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 
+  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
-
   if (!packageFullPath.endsWith(".dar")) {
     throw new Error("Invalid package path: the path must have a '.dar' extension.");
   }
@@ -33,6 +31,7 @@ async function publishPackage(packageFullPath) {
   if (!fs.existsSync(packageFullPath)) {
     throw new Error("package dar file does not exist.");
   }
+
   return DeployManager.publishPackage(packageFullPath);
 }
 
@@ -54,7 +53,7 @@ async function run() {
     const darPackagePath = core.getInput('darPackagePath');
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback');
-    var packageFullPath = '';
+    let packageFullPath = '';
 
     if (!serverUrl || !username || !password) {
       throw new Error('serverUrl, username, and password are required.');
@@ -71,7 +70,7 @@ async function run() {
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
-    }else{
+    } else {
       console.log('Digital.ai Deploy server is running and credentials are validated.');
     }
 
@@ -107,7 +106,6 @@ async function run() {
       default:
         throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, create_publish_deploy.`);
     }
-
   } catch (error) {
     core.setFailed(error.message);
   }

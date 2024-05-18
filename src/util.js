@@ -3,11 +3,13 @@ const xml2js = require("xml2js");
 
 class Util {
 
+    // Get version from manifest file
     static async GetVersionFromManifest(manifestPath) {
         const text = fs.readFileSync(manifestPath, "utf8");
         return await Util.GetVersion(text);
     }
 
+    // Get version from manifest content
     static async GetVersion(manifest) {
         const xml = await this.xml2json(manifest);
 
@@ -23,6 +25,7 @@ class Util {
         }
     }
 
+    // Check if input string starts with a specific value
     static StartsWith(inputString, value, ignoreCase) {
         const subString = inputString.substring(0, value.length);
 
@@ -33,6 +36,7 @@ class Util {
         }
     }
 
+    // Set version in the manifest file
     static async SetVersion(manifestPath, version) {
         const text = fs.readFileSync(manifestPath, "utf8");
         const xml = await this.xml2json(text);
@@ -49,15 +53,16 @@ class Util {
         }
 
         const builder = new xml2js.Builder();
-
         fs.writeFileSync(manifestPath, builder.buildObject(xml), "utf8");
     }
 
+    // Get application from manifest file
     static async GetApplicationFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         return await Util.GetApplication(manifest);
     }
 
+    // Get application from manifest content
     static async GetApplication(manifest) {
         const xml = await this.xml2json(manifest);
 
@@ -73,12 +78,14 @@ class Util {
         }
     }
 
+    // Get application name from manifest file
     static async GetApplicationNameFromManifest(manifestPath) {
         const application = await this.GetApplicationFromManifest(manifestPath);
         const splitPath = application.split("/");
         return splitPath[splitPath.length - 1];
     }
 
+    // Convert XML to JSON
     static async xml2json(xml) {
         return new Promise((resolve, reject) => {
             xml2js.parseString(xml, { explicitArray: false }, (err, json) => {
@@ -90,7 +97,6 @@ class Util {
             });
         });
     }
-
 }
 
 module.exports = Util;

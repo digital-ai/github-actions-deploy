@@ -65272,7 +65272,7 @@ const path = __nccwpck_require__(1017);
 const xml2js = __nccwpck_require__(7486);
 
 class Archive {
-
+    // Parse the manifest XML file and extract paths of files to be included in the package
     static async GetPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
@@ -65305,24 +65305,25 @@ class Archive {
         return Array.from(filesToInclude);
     }
 
+    // Create a new DAR package using the manifest file
     static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
         try {
-
-            const rootPath = process.cwd()
-
+            const rootPath = process.cwd();
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
+            // Copy the manifest file to the current working directory
             if (fs.existsSync(manifestFileFullPath)) {
                 //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
             }
-
             fs.copyFileSync(manifestPath, manifestFileFullPath);
 
+            // Create the output directory if it doesn't exist
             if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
             }
 
+            // Set the package name, ensuring it ends with .dar
             if (!packageName) {
                 packageName = "package.dar";
             } else if (!packageName.toLowerCase().endsWith(".dar")) {
@@ -65330,9 +65331,9 @@ class Archive {
             }
 
             var packageFullPath = path.join(outputPath, packageName);
-
             console.log(`Package path set: ${packageFullPath}`);
 
+            // Throw an error if a package already exists at the target path
             if (fs.existsSync(packageFullPath)) {
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
             }
@@ -65343,15 +65344,14 @@ class Archive {
             await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
 
-            return packageFullPath
-
+            return packageFullPath;
         } catch (error) {
             console.error("Error creating package:", error);
             throw error;
         }
-
     }
 
+    // Compress the files into a DAR package
     static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
         const archive = archiver("zip", {});
         const output = fs.createWriteStream(packageFullPath);
@@ -65378,7 +65378,6 @@ class Archive {
 
 module.exports = Archive;
 
-
 /***/ }),
 
 /***/ 2280:
@@ -65394,6 +65393,7 @@ class DeployManager {
 
   static serverConfig;
 
+  // General API request method
   static async apiRequest(endpoint, method, data, headers) {
     const { url, username, password } = this.serverConfig;
     try {
@@ -65401,10 +65401,7 @@ class DeployManager {
         url: `${url}${endpoint}`,
         method,
         headers,
-        auth: {
-          username,
-          password
-        },
+        auth: { username, password },
         data
       });
       return response.data;
@@ -65416,8 +65413,8 @@ class DeployManager {
     }
   }
 
+  // Publish a package
   static async publishPackage(packageFullPath) {
-
     const packageName = path.basename(packageFullPath);
     const fileData = fs.readFileSync(packageFullPath);
     const formData = new FormData();
@@ -65432,20 +65429,20 @@ class DeployManager {
     return response;
   }
 
+  // Get server state
   static async getServerState() {
     try {
       const endpoint = '/deployit/server/state';
       const headers = { 'Content-Type': 'application/json' };
       const response = await this.apiRequest(endpoint, 'GET', '', headers);
       return response['current-mode'];
-
     } catch (error) {
       return 'UNREACHABLE';
     }
   }
 
+  // Deploy a package
   static async deployPackage(packageFullPath, targetEnvironment, rollback) {
-
     if (!Util.StartsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
@@ -65459,20 +65456,20 @@ class DeployManager {
     const version = await Util.GetVersion(manifest);
     const deploymentPackageId = `Applications/${application}/${version}`;
 
-    console.log(`Package name is ${deploymentPackageId}`)
+    console.log(`Package name is ${deploymentPackageId}`);
     console.log(`Starting deployment to ${targetEnvironment}.`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
     console.log(`New deployment task has been successfully created with id ${deploymentId}.`);
 
-    await this.startDeploymentTask(deploymentId)
+    await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
+
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
-      // archive
+      // Archive the deployment task
       await this.archiveDeploymentTask(deploymentId);
       console.log(`Successfully deployed to ${targetEnvironment}.`);
     } else {
-
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
@@ -65486,16 +65483,16 @@ class DeployManager {
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
-        // archive
+        // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
         console.log("Deployment failed - Rollback executed successfully.");
       } else {
         throw new Error("Rollback failed.");
       }
-
     }
   }
 
+  // Check if the environment exists
   static async environmentExists(environmentId) {
     const endpoint = `/deployit/repository/exists/${environmentId}`;
     const headers = { 'Content-Type': 'application/json' };
@@ -65503,6 +65500,7 @@ class DeployManager {
     return response['boolean'];
   }
 
+  // Create deployment task
   static async createDeploymentTask(deploymentPackageId, targetEnvironment) {
     let deployment = await this.createDeployment(deploymentPackageId, targetEnvironment);
     deployment = await this.prepareDeployed(deployment);
@@ -65516,10 +65514,11 @@ class DeployManager {
     return task['string'];
   }
 
+  // Create deployment
   static async createDeployment(deploymentId, targetEnvironment) {
     const splitPath = deploymentId.split("/");
     const applicationName = splitPath[splitPath.length - 2];
-    splitPath.pop(); // remove version
+    splitPath.pop(); // Remove version
     const applicationFullName = splitPath.join("/");
 
     if (await this.deploymentExists(applicationFullName, targetEnvironment)) {
@@ -65528,6 +65527,7 @@ class DeployManager {
     return await this.getInitialDeployment(deploymentId, targetEnvironment);
   }
 
+  // Prepare deployment
   static async prepareDeployed(deployment) {
     const endpoint = `/deployit/deployment/prepare/deployeds`;
     const method = 'POST';
@@ -65536,6 +65536,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, deployment, headers);
   }
 
+  // Validate deployment
   static async validateDeployment(deployment) {
     const endpoint = `/deployit/deployment/validate`;
     const method = 'POST';
@@ -65544,6 +65545,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, deployment, headers);
   }
 
+  // Get deployment object
   static async getDeploymentObject(deploymentId, deployedApplication) {
     const deploymentIdEncoded = encodeURIComponent(deploymentId);
     const deployedApplicationEncoded = encodeURIComponent(deployedApplication);
@@ -65553,9 +65555,9 @@ class DeployManager {
     const headers = { 'Content-Type': 'application/json' };
 
     return await this.apiRequest(endpoint, method, '', headers);
-
   }
 
+  // Check if deployment exists
   static async deploymentExists(application, environment) {
     const subString = application.substring(0, "Applications/".length);
 
@@ -65574,7 +65576,7 @@ class DeployManager {
     return response['boolean'];
   }
 
-
+  // Get initial deployment
   static async getInitialDeployment(deploymentId, targetEnvironment) {
     const deploymentIdEncoded = encodeURIComponent(deploymentId);
     const targetEnvironmentEncoded = encodeURIComponent(targetEnvironment);
@@ -65586,6 +65588,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Start deployment task
   static async startDeploymentTask(deploymentId) {
     const endpoint = `/deployit/tasks/v2/${deploymentId}/start`;
     const method = 'POST';
@@ -65594,6 +65597,7 @@ class DeployManager {
     await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Wait for task to complete
   static async waitForTask(taskId) {
     const runningStates = ["QUEUED", "EXECUTING", "ABORTING", "STOPPING", "FAILING", "PENDING"];
     let task = await this.getDeploymentTask(taskId);
@@ -65606,6 +65610,7 @@ class DeployManager {
     return task.state;
   }
 
+  // Archive deployment task
   static async archiveDeploymentTask(taskId) {
     const endpoint = `/deployit/tasks/v2/${taskId}/archive`;
     const method = 'POST';
@@ -65614,6 +65619,7 @@ class DeployManager {
     await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Get deployment task
   static async getDeploymentTask(taskId) {
     const endpoint = `/deployit/tasks/v2/${taskId}`;
     const method = 'GET';
@@ -65623,6 +65629,7 @@ class DeployManager {
     return response;
   }
 
+  // Create rollback task
   static async createRollbackTask(taskId) {
     const endpoint = `/deployit/deployment/rollback/${taskId}`;
     const method = 'POST';
@@ -65632,13 +65639,13 @@ class DeployManager {
     return response['string'];
   }
 
+  // Sleep for a given duration
   static sleepFor(sleepDurationInSeconds) {
     return new Promise((resolve) => setTimeout(resolve, sleepDurationInSeconds * 1000));
   }
 }
 
 module.exports = DeployManager;
-
 
 /***/ }),
 
@@ -65653,11 +65660,10 @@ const DeployManager = __nccwpck_require__(2280);
 const Util = __nccwpck_require__(7621);
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
-
   if (!manifestPath.endsWith(".xml")) {
     throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
   }
-  
+
   const manifestFullPath = path.join(process.cwd(), manifestPath);
   if (!fs.existsSync(manifestFullPath)) {
     throw new Error("manifest file does not exist.");
@@ -65667,12 +65673,11 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (versionNumber) {
     Util.SetVersion(manifestFullPath, versionNumber);
   }
-  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 
+  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
-
   if (!packageFullPath.endsWith(".dar")) {
     throw new Error("Invalid package path: the path must have a '.dar' extension.");
   }
@@ -65680,6 +65685,7 @@ async function publishPackage(packageFullPath) {
   if (!fs.existsSync(packageFullPath)) {
     throw new Error("package dar file does not exist.");
   }
+
   return DeployManager.publishPackage(packageFullPath);
 }
 
@@ -65701,7 +65707,7 @@ async function run() {
     const darPackagePath = core.getInput('darPackagePath');
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback');
-    var packageFullPath = '';
+    let packageFullPath = '';
 
     if (!serverUrl || !username || !password) {
       throw new Error('serverUrl, username, and password are required.');
@@ -65718,7 +65724,7 @@ async function run() {
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
-    }else{
+    } else {
       console.log('Digital.ai Deploy server is running and credentials are validated.');
     }
 
@@ -65754,7 +65760,6 @@ async function run() {
       default:
         throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, create_publish_deploy.`);
     }
-
   } catch (error) {
     core.setFailed(error.message);
   }
@@ -65766,7 +65771,6 @@ module.exports = {
 
 run();
 
-
 /***/ }),
 
 /***/ 7621:
@@ -65777,11 +65781,13 @@ const xml2js = __nccwpck_require__(7486);
 
 class Util {
 
+    // Get version from manifest file
     static async GetVersionFromManifest(manifestPath) {
         const text = fs.readFileSync(manifestPath, "utf8");
         return await Util.GetVersion(text);
     }
 
+    // Get version from manifest content
     static async GetVersion(manifest) {
         const xml = await this.xml2json(manifest);
 
@@ -65797,6 +65803,7 @@ class Util {
         }
     }
 
+    // Check if input string starts with a specific value
     static StartsWith(inputString, value, ignoreCase) {
         const subString = inputString.substring(0, value.length);
 
@@ -65807,6 +65814,7 @@ class Util {
         }
     }
 
+    // Set version in the manifest file
     static async SetVersion(manifestPath, version) {
         const text = fs.readFileSync(manifestPath, "utf8");
         const xml = await this.xml2json(text);
@@ -65823,15 +65831,16 @@ class Util {
         }
 
         const builder = new xml2js.Builder();
-
         fs.writeFileSync(manifestPath, builder.buildObject(xml), "utf8");
     }
 
+    // Get application from manifest file
     static async GetApplicationFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         return await Util.GetApplication(manifest);
     }
 
+    // Get application from manifest content
     static async GetApplication(manifest) {
         const xml = await this.xml2json(manifest);
 
@@ -65847,12 +65856,14 @@ class Util {
         }
     }
 
+    // Get application name from manifest file
     static async GetApplicationNameFromManifest(manifestPath) {
         const application = await this.GetApplicationFromManifest(manifestPath);
         const splitPath = application.split("/");
         return splitPath[splitPath.length - 1];
     }
 
+    // Convert XML to JSON
     static async xml2json(xml) {
         return new Promise((resolve, reject) => {
             xml2js.parseString(xml, { explicitArray: false }, (err, json) => {
@@ -65864,11 +65875,9 @@ class Util {
             });
         });
     }
-
 }
 
 module.exports = Util;
-
 
 /***/ }),
 
@@ -65878,6 +65887,9 @@ module.exports = Util;
 const StreamZip = __nccwpck_require__(4603);
 
 class Zip {
+    
+    //Extracts the 'deployit-manifest.xml' from the provided zip package.
+     
     static async GetManifestFromPackage(packagePath) {
         const zip = await Zip.openStreamZip(packagePath);
 
@@ -65895,6 +65907,8 @@ class Zip {
         }
     }
 
+    // Opens a zip file using StreamZip.
+    
     static async openStreamZip(zipFile) {
         const params = {
             file: zipFile,

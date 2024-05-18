@@ -1,6 +1,9 @@
 const StreamZip = require("node-stream-zip");
 
 class Zip {
+    
+    //Extracts the 'deployit-manifest.xml' from the provided zip package.
+     
     static async GetManifestFromPackage(packagePath) {
         const zip = await Zip.openStreamZip(packagePath);
 
@@ -18,6 +21,8 @@ class Zip {
         }
     }
 
+    // Opens a zip file using StreamZip.
+    
     static async openStreamZip(zipFile) {
         const params = {
             file: zipFile,

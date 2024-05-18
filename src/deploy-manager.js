@@ -8,6 +8,7 @@ class DeployManager {
 
   static serverConfig;
 
+  // General API request method
   static async apiRequest(endpoint, method, data, headers) {
     const { url, username, password } = this.serverConfig;
     try {
@@ -15,10 +16,7 @@ class DeployManager {
         url: `${url}${endpoint}`,
         method,
         headers,
-        auth: {
-          username,
-          password
-        },
+        auth: { username, password },
         data
       });
       return response.data;
@@ -30,8 +28,8 @@ class DeployManager {
     }
   }
 
+  // Publish a package
   static async publishPackage(packageFullPath) {
-
     const packageName = path.basename(packageFullPath);
     const fileData = fs.readFileSync(packageFullPath);
     const formData = new FormData();
@@ -46,20 +44,20 @@ class DeployManager {
     return response;
   }
 
+  // Get server state
   static async getServerState() {
     try {
       const endpoint = '/deployit/server/state';
       const headers = { 'Content-Type': 'application/json' };
       const response = await this.apiRequest(endpoint, 'GET', '', headers);
       return response['current-mode'];
-
     } catch (error) {
       return 'UNREACHABLE';
     }
   }
 
+  // Deploy a package
   static async deployPackage(packageFullPath, targetEnvironment, rollback) {
-
     if (!Util.StartsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
@@ -73,20 +71,20 @@ class DeployManager {
     const version = await Util.GetVersion(manifest);
     const deploymentPackageId = `Applications/${application}/${version}`;
 
-    console.log(`Package name is ${deploymentPackageId}`)
+    console.log(`Package name is ${deploymentPackageId}`);
     console.log(`Starting deployment to ${targetEnvironment}.`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
     console.log(`New deployment task has been successfully created with id ${deploymentId}.`);
 
-    await this.startDeploymentTask(deploymentId)
+    await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
+
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
-      // archive
+      // Archive the deployment task
       await this.archiveDeploymentTask(deploymentId);
       console.log(`Successfully deployed to ${targetEnvironment}.`);
     } else {
-
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
@@ -100,16 +98,16 @@ class DeployManager {
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
-        // archive
+        // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
         console.log("Deployment failed - Rollback executed successfully.");
       } else {
         throw new Error("Rollback failed.");
       }
-
     }
   }
 
+  // Check if the environment exists
   static async environmentExists(environmentId) {
     const endpoint = `/deployit/repository/exists/${environmentId}`;
     const headers = { 'Content-Type': 'application/json' };
@@ -117,6 +115,7 @@ class DeployManager {
     return response['boolean'];
   }
 
+  // Create deployment task
   static async createDeploymentTask(deploymentPackageId, targetEnvironment) {
     let deployment = await this.createDeployment(deploymentPackageId, targetEnvironment);
     deployment = await this.prepareDeployed(deployment);
@@ -130,10 +129,11 @@ class DeployManager {
     return task['string'];
   }
 
+  // Create deployment
   static async createDeployment(deploymentId, targetEnvironment) {
     const splitPath = deploymentId.split("/");
     const applicationName = splitPath[splitPath.length - 2];
-    splitPath.pop(); // remove version
+    splitPath.pop(); // Remove version
     const applicationFullName = splitPath.join("/");
 
     if (await this.deploymentExists(applicationFullName, targetEnvironment)) {
@@ -142,6 +142,7 @@ class DeployManager {
     return await this.getInitialDeployment(deploymentId, targetEnvironment);
   }
 
+  // Prepare deployment
   static async prepareDeployed(deployment) {
     const endpoint = `/deployit/deployment/prepare/deployeds`;
     const method = 'POST';
@@ -150,6 +151,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, deployment, headers);
   }
 
+  // Validate deployment
   static async validateDeployment(deployment) {
     const endpoint = `/deployit/deployment/validate`;
     const method = 'POST';
@@ -158,6 +160,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, deployment, headers);
   }
 
+  // Get deployment object
   static async getDeploymentObject(deploymentId, deployedApplication) {
     const deploymentIdEncoded = encodeURIComponent(deploymentId);
     const deployedApplicationEncoded = encodeURIComponent(deployedApplication);
@@ -167,9 +170,9 @@ class DeployManager {
     const headers = { 'Content-Type': 'application/json' };
 
     return await this.apiRequest(endpoint, method, '', headers);
-
   }
 
+  // Check if deployment exists
   static async deploymentExists(application, environment) {
     const subString = application.substring(0, "Applications/".length);
 
@@ -188,7 +191,7 @@ class DeployManager {
     return response['boolean'];
   }
 
-
+  // Get initial deployment
   static async getInitialDeployment(deploymentId, targetEnvironment) {
     const deploymentIdEncoded = encodeURIComponent(deploymentId);
     const targetEnvironmentEncoded = encodeURIComponent(targetEnvironment);
@@ -200,6 +203,7 @@ class DeployManager {
     return await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Start deployment task
   static async startDeploymentTask(deploymentId) {
     const endpoint = `/deployit/tasks/v2/${deploymentId}/start`;
     const method = 'POST';
@@ -208,6 +212,7 @@ class DeployManager {
     await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Wait for task to complete
   static async waitForTask(taskId) {
     const runningStates = ["QUEUED", "EXECUTING", "ABORTING", "STOPPING", "FAILING", "PENDING"];
     let task = await this.getDeploymentTask(taskId);
@@ -220,6 +225,7 @@ class DeployManager {
     return task.state;
   }
 
+  // Archive deployment task
   static async archiveDeploymentTask(taskId) {
     const endpoint = `/deployit/tasks/v2/${taskId}/archive`;
     const method = 'POST';
@@ -228,6 +234,7 @@ class DeployManager {
     await this.apiRequest(endpoint, method, '', headers);
   }
 
+  // Get deployment task
   static async getDeploymentTask(taskId) {
     const endpoint = `/deployit/tasks/v2/${taskId}`;
     const method = 'GET';
@@ -237,6 +244,7 @@ class DeployManager {
     return response;
   }
 
+  // Create rollback task
   static async createRollbackTask(taskId) {
     const endpoint = `/deployit/deployment/rollback/${taskId}`;
     const method = 'POST';
@@ -246,6 +254,7 @@ class DeployManager {
     return response['string'];
   }
 
+  // Sleep for a given duration
   static sleepFor(sleepDurationInSeconds) {
     return new Promise((resolve) => setTimeout(resolve, sleepDurationInSeconds * 1000));
   }

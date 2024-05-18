@@ -4,7 +4,7 @@ const path = require("path");
 const xml2js = require("xml2js");
 
 class Archive {
-
+    // Parse the manifest XML file and extract paths of files to be included in the package
     static async GetPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
@@ -37,24 +37,25 @@ class Archive {
         return Array.from(filesToInclude);
     }
 
+    // Create a new DAR package using the manifest file
     static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
         try {
-
-            const rootPath = process.cwd()
-
+            const rootPath = process.cwd();
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
+            // Copy the manifest file to the current working directory
             if (fs.existsSync(manifestFileFullPath)) {
                 //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
             }
-
             fs.copyFileSync(manifestPath, manifestFileFullPath);
 
+            // Create the output directory if it doesn't exist
             if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
             }
 
+            // Set the package name, ensuring it ends with .dar
             if (!packageName) {
                 packageName = "package.dar";
             } else if (!packageName.toLowerCase().endsWith(".dar")) {
@@ -62,9 +63,9 @@ class Archive {
             }
 
             var packageFullPath = path.join(outputPath, packageName);
-
             console.log(`Package path set: ${packageFullPath}`);
 
+            // Throw an error if a package already exists at the target path
             if (fs.existsSync(packageFullPath)) {
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
             }
@@ -75,15 +76,14 @@ class Archive {
             await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
 
-            return packageFullPath
-
+            return packageFullPath;
         } catch (error) {
             console.error("Error creating package:", error);
             throw error;
         }
-
     }
 
+    // Compress the files into a DAR package
     static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
         const archive = archiver("zip", {});
         const output = fs.createWriteStream(packageFullPath);
