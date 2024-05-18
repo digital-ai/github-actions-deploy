@@ -35,7 +35,8 @@ jobs:
           environmentId: 'Environments/envForAction'
           rollback: 'yes'
  ```
-#### Example project : [https://github.com/digital-ai/github-actions-deploy-demo](https://github.com/digital-ai/github-actions-deploy-demo)
+#### Example project : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
+
 
 ## Inputs
 
