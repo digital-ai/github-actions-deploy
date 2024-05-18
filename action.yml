@@ -1,12 +1,44 @@
-name: Create and Deploy Package on Digital.ai Deploy
+name: Create, Publish and Deploy Package on Digital.ai Deploy
 
 description: |
-  This GitHub Action enables the creation of a new pakage and deploy it on the Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, automating deploy management processes.
+  This GitHub Action automates the creation, publishing, and deployment of packages on Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, streamlining your deployment management processes.
 
 inputs:
-  manifestPath:
-    description: 'The path of the deployit-manifest.xml file.'
+
+  serverUrl:
+    description: 'The URL of the Digital.ai Deploy server.'
     required: true
+  username:
+    description: 'The username for authenticating with Digital.ai Deploy.'
+    required: true
+  password:
+    description: 'The password for authenticating with Digital.ai Deploy.'
+    required: true
+  action:
+    description: 'Action to perform: create, publish, deploy. Default is create, publish, and deploy.'
+    required: false
+    default: 'create_publish_deploy'    
+  manifestPath:
+    description: 'The path to the deployit-manifest.xml file.'
+    required: false
+  outputPath:
+    description: 'The path for storing the newly created DAR package.'
+    required: false
+  packageName:
+    description: 'The name of the newly created DAR package.'
+    required: false    
+  versionNumber:
+    description: 'Specify a version number to set in your manifest file.'
+    required: false    
+  darPackagePath:
+    description: 'The path to the DAR package.'
+    required: false
+  environmentId:
+    description: 'ID of the target environment in Digital.ai Deploy.'
+    required: false
+  rollback:
+    description: 'Invoke a rollback in case of deployment failure.'
+    required: false
 
 runs:
   using: 'node20'
