@@ -1,4 +1,4 @@
-# Digital.ai Deploy GitHub Action
+# Digital.ai Deploy GitHub Actions
 
 This GitHub Action automates the creation, publishing, and deployment of packages on Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, streamlining your deployment management processes.
 
@@ -7,6 +7,35 @@ This GitHub Action automates the creation, publishing, and deployment of package
 - **Create**: Generate a new DAR package from a specified manifest file.
 - **Publish**: Upload a DAR package to Digital.ai Deploy.
 - **Deploy**: Deploy a DAR package to a specified environment.
+
+## Example Usage
+
+```yaml
+name: Build and Deploy Package
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Create Publish and Deploy Package
+        id: deploy
+        uses: digital-ai/github-actions-deploy@main
+        with:
+          serverUrl: ${{ secrets.SERVERURL }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          manifestPath: '/deployit-manifest.xml'
+          action: 'create_publish_deploy'
+          outputPath: '/outputdar'
+          versionNumber: ${{ vars.VERSIONNUMBER }}
+          packageName: 'appForAction-1.0.dar'
+          environmentId: 'Environments/envForAction'
+          rollback: 'yes'
+ ```
+#### Example project : [https://github.com/digital-ai/github-actions-deploy-demo](https://github.com/digital-ai/github-actions-deploy-demo)
 
 ## Inputs
 
