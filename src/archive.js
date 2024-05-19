@@ -5,7 +5,7 @@ const xml2js = require("xml2js");
 
 class Archive {
     // Parse the manifest XML file and extract paths of files to be included in the package
-    static async GetPathsFromManifest(manifestPath) {
+    static async getPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
             xml2js.parseString(manifest, { explicitArray: false }, (err, json) => {
@@ -38,7 +38,7 @@ class Archive {
     }
 
     // Create a new DAR package using the manifest file
-    static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
+    static async createNewDarPackage(manifestPath, outputPath, packageName) {
         try {
             const rootPath = process.cwd();
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
@@ -70,10 +70,10 @@ class Archive {
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
             }
 
-            const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
+            const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
             console.log(`Files to include in the package = ${filesToInclude}`);
 
-            await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
+            await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
 
             return packageFullPath;
@@ -84,7 +84,7 @@ class Archive {
     }
 
     // Compress the files into a DAR package
-    static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
+    static async compressPackage(packageFullPath, filesToInclude, rootPath) {
         const archive = archiver("zip", {});
         const output = fs.createWriteStream(packageFullPath);
 

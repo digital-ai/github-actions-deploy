@@ -17,10 +17,10 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 
   const outputFullPath = path.join(process.cwd(), outputPath);
   if (versionNumber) {
-    Util.SetVersion(manifestFullPath, versionNumber);
+    Util.setVersion(manifestFullPath, versionNumber);
   }
 
-  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
+  return Archive.createNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
