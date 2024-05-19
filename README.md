@@ -13,7 +13,7 @@ This GitHub Action automates the creation, publishing, and deployment of package
 ```yaml
 name: Build and Deploy Package
 
-on: [workflow_dispatch]
+on: [push]
 
 jobs:
   build:
@@ -35,7 +35,9 @@ jobs:
           environmentId: 'Environments/envForAction'
           rollback: 'yes'
  ```
-#### Example project : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
+## Example project 
+
+An example repository using this action : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
 
 
 ## Inputs
