@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 const Util = require('./util');
 const Zip = require('./zip');
 
@@ -33,9 +34,9 @@ class DeployManager {
     const packageName = path.basename(packageFullPath);
     const fileData = fs.readFileSync(packageFullPath);
     const formData = new FormData();
-    const blob = new Blob([fileData], { type: 'application/octet-stream' });
-    formData.append('fileData', blob, packageName);
-    const headers = { 'Content-Type': 'multipart/form-data' };
+    formData.append('fileData', fileData, packageName);
+
+    const headers = formData.getHeaders();
     const endpoint = `/deployit/package/upload/${packageName}`;
     const method = 'POST';
 
