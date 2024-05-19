@@ -65273,7 +65273,7 @@ const xml2js = __nccwpck_require__(7486);
 
 class Archive {
     // Parse the manifest XML file and extract paths of files to be included in the package
-    static async GetPathsFromManifest(manifestPath) {
+    static async getPathsFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
             xml2js.parseString(manifest, { explicitArray: false }, (err, json) => {
@@ -65306,7 +65306,7 @@ class Archive {
     }
 
     // Create a new DAR package using the manifest file
-    static async CreateNewDarPackage(manifestPath, outputPath, packageName) {
+    static async createNewDarPackage(manifestPath, outputPath, packageName) {
         try {
             const rootPath = process.cwd();
             const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
@@ -65338,10 +65338,10 @@ class Archive {
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
             }
 
-            const filesToInclude = await Archive.GetPathsFromManifest(manifestPath);
+            const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
             console.log(`Files to include in the package = ${filesToInclude}`);
 
-            await Archive.CompressPackage(packageFullPath, filesToInclude, rootPath);
+            await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
 
             return packageFullPath;
@@ -65352,7 +65352,7 @@ class Archive {
     }
 
     // Compress the files into a DAR package
-    static async CompressPackage(packageFullPath, filesToInclude, rootPath) {
+    static async compressPackage(packageFullPath, filesToInclude, rootPath) {
         const archive = archiver("zip", {});
         const output = fs.createWriteStream(packageFullPath);
 
@@ -65443,7 +65443,7 @@ class DeployManager {
 
   // Deploy a package
   static async deployPackage(packageFullPath, targetEnvironment, rollback) {
-    if (!Util.StartsWith(targetEnvironment, "Environments/", true)) {
+    if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
 
@@ -65451,9 +65451,9 @@ class DeployManager {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
     }
 
-    const manifest = await Zip.GetManifestFromPackage(packageFullPath);
-    const application = await Util.GetApplication(manifest);
-    const version = await Util.GetVersion(manifest);
+    const manifest = await Zip.getManifestFromPackage(packageFullPath);
+    const application = await Util.getApplication(manifest);
+    const version = await Util.getVersion(manifest);
     const deploymentPackageId = `Applications/${application}/${version}`;
 
     console.log(`Package name is ${deploymentPackageId}`);
@@ -65671,10 +65671,10 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 
   const outputFullPath = path.join(process.cwd(), outputPath);
   if (versionNumber) {
-    Util.SetVersion(manifestFullPath, versionNumber);
+    Util.setVersion(manifestFullPath, versionNumber);
   }
 
-  return Archive.CreateNewDarPackage(manifestFullPath, outputFullPath, packageName);
+  return Archive.createNewDarPackage(manifestFullPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
@@ -65782,13 +65782,13 @@ const xml2js = __nccwpck_require__(7486);
 class Util {
 
     // Get version from manifest file
-    static async GetVersionFromManifest(manifestPath) {
+    static async getVersionFromManifest(manifestPath) {
         const text = fs.readFileSync(manifestPath, "utf8");
-        return await Util.GetVersion(text);
+        return await Util.getVersion(text);
     }
 
     // Get version from manifest content
-    static async GetVersion(manifest) {
+    static async getVersion(manifest) {
         const xml = await this.xml2json(manifest);
 
         const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
@@ -65804,7 +65804,7 @@ class Util {
     }
 
     // Check if input string starts with a specific value
-    static StartsWith(inputString, value, ignoreCase) {
+    static startsWith(inputString, value, ignoreCase) {
         const subString = inputString.substring(0, value.length);
 
         if (ignoreCase) {
@@ -65815,7 +65815,7 @@ class Util {
     }
 
     // Set version in the manifest file
-    static async SetVersion(manifestPath, version) {
+    static async setVersion(manifestPath, version) {
         const text = fs.readFileSync(manifestPath, "utf8");
         const xml = await this.xml2json(text);
 
@@ -65835,13 +65835,13 @@ class Util {
     }
 
     // Get application from manifest file
-    static async GetApplicationFromManifest(manifestPath) {
+    static async getApplicationFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
-        return await Util.GetApplication(manifest);
+        return await Util.getApplication(manifest);
     }
 
     // Get application from manifest content
-    static async GetApplication(manifest) {
+    static async getApplication(manifest) {
         const xml = await this.xml2json(manifest);
 
         const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
@@ -65857,8 +65857,8 @@ class Util {
     }
 
     // Get application name from manifest file
-    static async GetApplicationNameFromManifest(manifestPath) {
-        const application = await this.GetApplicationFromManifest(manifestPath);
+    static async getApplicationNameFromManifest(manifestPath) {
+        const application = await this.getApplicationFromManifest(manifestPath);
         const splitPath = application.split("/");
         return splitPath[splitPath.length - 1];
     }
@@ -65890,7 +65890,7 @@ class Zip {
     
     //Extracts the 'deployit-manifest.xml' from the provided zip package.
      
-    static async GetManifestFromPackage(packagePath) {
+    static async getManifestFromPackage(packagePath) {
         const zip = await Zip.openStreamZip(packagePath);
 
         try {

@@ -4,7 +4,7 @@ class Zip {
     
     //Extracts the 'deployit-manifest.xml' from the provided zip package.
      
-    static async GetManifestFromPackage(packagePath) {
+    static async getManifestFromPackage(packagePath) {
         const zip = await Zip.openStreamZip(packagePath);
 
         try {

@@ -58,7 +58,7 @@ class DeployManager {
 
   // Deploy a package
   static async deployPackage(packageFullPath, targetEnvironment, rollback) {
-    if (!Util.StartsWith(targetEnvironment, "Environments/", true)) {
+    if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
 
@@ -66,9 +66,9 @@ class DeployManager {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
     }
 
-    const manifest = await Zip.GetManifestFromPackage(packageFullPath);
-    const application = await Util.GetApplication(manifest);
-    const version = await Util.GetVersion(manifest);
+    const manifest = await Zip.getManifestFromPackage(packageFullPath);
+    const application = await Util.getApplication(manifest);
+    const version = await Util.getVersion(manifest);
     const deploymentPackageId = `Applications/${application}/${version}`;
 
     console.log(`Package name is ${deploymentPackageId}`);

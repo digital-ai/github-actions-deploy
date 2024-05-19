@@ -4,13 +4,13 @@ const xml2js = require("xml2js");
 class Util {
 
     // Get version from manifest file
-    static async GetVersionFromManifest(manifestPath) {
+    static async getVersionFromManifest(manifestPath) {
         const text = fs.readFileSync(manifestPath, "utf8");
-        return await Util.GetVersion(text);
+        return await Util.getVersion(text);
     }
 
     // Get version from manifest content
-    static async GetVersion(manifest) {
+    static async getVersion(manifest) {
         const xml = await this.xml2json(manifest);
 
         const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
@@ -26,7 +26,7 @@ class Util {
     }
 
     // Check if input string starts with a specific value
-    static StartsWith(inputString, value, ignoreCase) {
+    static startsWith(inputString, value, ignoreCase) {
         const subString = inputString.substring(0, value.length);
 
         if (ignoreCase) {
@@ -37,7 +37,7 @@ class Util {
     }
 
     // Set version in the manifest file
-    static async SetVersion(manifestPath, version) {
+    static async setVersion(manifestPath, version) {
         const text = fs.readFileSync(manifestPath, "utf8");
         const xml = await this.xml2json(text);
 
@@ -57,13 +57,13 @@ class Util {
     }
 
     // Get application from manifest file
-    static async GetApplicationFromManifest(manifestPath) {
+    static async getApplicationFromManifest(manifestPath) {
         const manifest = fs.readFileSync(manifestPath, "utf8");
-        return await Util.GetApplication(manifest);
+        return await Util.getApplication(manifest);
     }
 
     // Get application from manifest content
-    static async GetApplication(manifest) {
+    static async getApplication(manifest) {
         const xml = await this.xml2json(manifest);
 
         const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
@@ -79,8 +79,8 @@ class Util {
     }
 
     // Get application name from manifest file
-    static async GetApplicationNameFromManifest(manifestPath) {
-        const application = await this.GetApplicationFromManifest(manifestPath);
+    static async getApplicationNameFromManifest(manifestPath) {
+        const application = await this.getApplicationFromManifest(manifestPath);
         const splitPath = application.split("/");
         return splitPath[splitPath.length - 1];
     }
