@@ -65386,6 +65386,7 @@ module.exports = Archive;
 const axios = __nccwpck_require__(6342);
 const fs = __nccwpck_require__(7147);
 const path = __nccwpck_require__(1017);
+const FormData = __nccwpck_require__(9412);
 const Util = __nccwpck_require__(7621);
 const Zip = __nccwpck_require__(250);
 
@@ -65418,9 +65419,9 @@ class DeployManager {
     const packageName = path.basename(packageFullPath);
     const fileData = fs.readFileSync(packageFullPath);
     const formData = new FormData();
-    const blob = new Blob([fileData], { type: 'application/octet-stream' });
-    formData.append('fileData', blob, packageName);
-    const headers = { 'Content-Type': 'multipart/form-data' };
+    formData.append('fileData', fileData, packageName);
+
+    const headers = formData.getHeaders();
     const endpoint = `/deployit/package/upload/${packageName}`;
     const method = 'POST';
 
