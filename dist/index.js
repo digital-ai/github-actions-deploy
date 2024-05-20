@@ -65487,6 +65487,7 @@ class DeployManager {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
         console.log("Deployment failed - Rollback executed successfully.");
+        throw new Error("Deployment failed - Rollback executed successfully.");
       } else {
         throw new Error("Rollback failed.");
       }
