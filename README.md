@@ -22,7 +22,7 @@ jobs:
 
       - name: Create Publish and Deploy Package
         id: deploy
-        uses: digital-ai/github-actions-deploy@main
+        uses: digital-ai/github-actions-deploy@v1.0.0-beta.1
         with:
           serverUrl: ${{ secrets.SERVERURL }}
           username: ${{ secrets.USERNAME }}
