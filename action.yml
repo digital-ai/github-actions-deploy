@@ -1,10 +1,11 @@
-name: Create, Publish and Deploy Package on Digital.ai Deploy
-
-description: |
-  This GitHub Action automates the creation, publishing, and deployment of packages on Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, streamlining your deployment management processes.
+name: 'Digital.ai Deploy Integration'
+description: 'Github Actions for Digital.ai Deploy'
+author: 'Digital.ai'
+branding:
+  color: 'green'
+  icon: 'upload-cloud'
 
 inputs:
-
   serverUrl:
     description: 'The URL of the Digital.ai Deploy server.'
     required: true
@@ -43,6 +44,3 @@ inputs:
 runs:
   using: 'node20'
   main: 'dist/index.js'
-
-author:
-  name: 'Digital.ai'
