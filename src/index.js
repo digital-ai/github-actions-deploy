@@ -17,7 +17,7 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 
   const outputFullPath = path.join(process.cwd(), outputPath);
   if (versionNumber) {
-    Util.setVersion(manifestFullPath, versionNumber);
+    await Util.setVersion(manifestFullPath, versionNumber);
   }
 
   return Archive.createNewDarPackage(manifestFullPath, outputFullPath, packageName);
