@@ -96,6 +96,13 @@ async function run() {
         await deployPackage(packageFullPath, environmentId, rollback);
         break;
 
+      case 'deploy_only':
+        validateInputs(['darPackagePath', 'environmentId']);
+        packageFullPath = path.join(process.cwd(), darPackagePath);
+        console.log(`Deploying package from path: ${packageFullPath}`);
+        await deployPackage(packageFullPath, environmentId, rollback);
+        break;
+
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
@@ -104,7 +111,7 @@ async function run() {
         break;
 
       default:
-        throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, create_publish_deploy.`);
+        throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, deploy_only, create_publish_deploy.`);
     }
   } catch (error) {
     core.setFailed(error.message);
