@@ -66057,8 +66057,13 @@ class Archive {
 
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
+            
+            const relativePath = path.relative(process.cwd(), packageFullPath);
+            const packageRelativePath = relativePath.startsWith(path.sep)? relativePath : path.sep + relativePath;
 
-            return packageFullPath;
+            console.log(`Package relative path: ${packageRelativePath}`);
+
+            return packageRelativePath;
         } catch (error) {
             console.error("Error creating package:", error);
             throw error;
@@ -66140,9 +66145,8 @@ class DeployManager {
     const method = 'POST';
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
-    console.log(`Package ${packageName} published successfully!`);
-    console.log(`Response: ${response['id']}`);
-    return response;
+    console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
+    return response.id;
   }
 
   // Get server state
@@ -66158,7 +66162,7 @@ class DeployManager {
   }
 
   // Deploy a package
-  static async deployPackage(packageFullPath, targetEnvironment, rollback) {
+  static async deployPackage(deploymentPackageId, targetEnvironment, rollback) {
     if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
@@ -66167,12 +66171,7 @@ class DeployManager {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
     }
 
-    const manifest = await Zip.getManifestFromPackage(packageFullPath);
-    const application = await Util.getApplication(manifest);
-    const version = await Util.getVersion(manifest);
-    const deploymentPackageId = `Applications/${application}/${version}`;
-
-    console.log(`Package name is ${deploymentPackageId}`);
+    console.log(`Package Id is ${deploymentPackageId}`);
     console.log(`Starting deployment to ${targetEnvironment}.`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
@@ -66406,8 +66405,8 @@ async function publishPackage(packageFullPath) {
   return DeployManager.publishPackage(packageFullPath);
 }
 
-async function deployPackage(packageFullPath, targetEnvironment, rollback) {
-  return DeployManager.deployPackage(packageFullPath, targetEnvironment, rollback);
+async function deployPackage(packageId, targetEnvironment, rollback) {
+  return DeployManager.deployPackage(packageId, targetEnvironment, rollback);
 }
 
 async function run() {
@@ -66456,22 +66455,29 @@ async function run() {
     switch (action) {
       case 'create_publish':
         validateInputs(['manifestPath', 'outputPath']);
-        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(packageFullPath);
+        packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        core.setOutput('darPackagePath', packageRelativePath);
+        packageFullPath = path.join(process.cwd(), packageRelativePath);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
         break;
 
       case 'publish_deploy':
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePath);
-        await publishPackage(packageFullPath);
-        await deployPackage(packageFullPath, environmentId, rollback);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
+        await deployPackage(packageId, environmentId, rollback);
         break;
 
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
-        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(packageFullPath);
-        await deployPackage(packageFullPath, environmentId, rollback);
+        packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        core.setOutput('darPackagePath', packageRelativePath);
+        packageFullPath = path.join(process.cwd(), packageRelativePath);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
+        await deployPackage(packageId, environmentId, rollback);
         break;
 
       default:
@@ -66610,25 +66616,6 @@ const StreamZip = __nccwpck_require__(9588);
 
 class Zip {
     
-    //Extracts the 'deployit-manifest.xml' from the provided zip package.
-     
-    static async getManifestFromPackage(packagePath) {
-        const zip = await Zip.openStreamZip(packagePath);
-
-        try {
-            const data = zip.entryDataSync("deployit-manifest.xml");
-            return data.toString("utf8");
-        } catch (error) {
-            if (error === "Entry not found") {
-                throw new Error("Manifest file not found inside the deployment package.");
-            } else {
-                throw new Error(error);
-            }
-        } finally {
-            zip.close();
-        }
-    }
-
     // Opens a zip file using StreamZip.
     
     static async openStreamZip(zipFile) {

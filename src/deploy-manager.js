@@ -41,9 +41,8 @@ class DeployManager {
     const method = 'POST';
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
-    console.log(`Package ${packageName} published successfully!`);
-    console.log(`Response: ${response['id']}`);
-    return response;
+    console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
+    return response.id;
   }
 
   // Get server state
@@ -59,7 +58,7 @@ class DeployManager {
   }
 
   // Deploy a package
-  static async deployPackage(packageFullPath, targetEnvironment, rollback) {
+  static async deployPackage(deploymentPackageId, targetEnvironment, rollback) {
     if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
@@ -68,12 +67,7 @@ class DeployManager {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
     }
 
-    const manifest = await Zip.getManifestFromPackage(packageFullPath);
-    const application = await Util.getApplication(manifest);
-    const version = await Util.getVersion(manifest);
-    const deploymentPackageId = `Applications/${application}/${version}`;
-
-    console.log(`Package name is ${deploymentPackageId}`);
+    console.log(`Package Id is ${deploymentPackageId}`);
     console.log(`Starting deployment to ${targetEnvironment}.`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);

@@ -41,6 +41,12 @@ inputs:
     description: 'Invoke a rollback in case of deployment failure.'
     required: false
 
+outputs:
+  packageId:
+    description: 'The ID of the published package.' 
+  darPackagePath:
+    description: 'The relative path to the DAR package created by the action.'  
+
 runs:
   using: 'node20'
   main: 'dist/index.js'

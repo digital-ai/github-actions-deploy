@@ -35,8 +35,8 @@ async function publishPackage(packageFullPath) {
   return DeployManager.publishPackage(packageFullPath);
 }
 
-async function deployPackage(packageFullPath, targetEnvironment, rollback) {
-  return DeployManager.deployPackage(packageFullPath, targetEnvironment, rollback);
+async function deployPackage(packageId, targetEnvironment, rollback) {
+  return DeployManager.deployPackage(packageId, targetEnvironment, rollback);
 }
 
 async function run() {
@@ -85,22 +85,29 @@ async function run() {
     switch (action) {
       case 'create_publish':
         validateInputs(['manifestPath', 'outputPath']);
-        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(packageFullPath);
+        packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        core.setOutput('darPackagePath', packageRelativePath);
+        packageFullPath = path.join(process.cwd(), packageRelativePath);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
         break;
 
       case 'publish_deploy':
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePath);
-        await publishPackage(packageFullPath);
-        await deployPackage(packageFullPath, environmentId, rollback);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
+        await deployPackage(packageId, environmentId, rollback);
         break;
 
       case 'create_publish_deploy':
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
-        packageFullPath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        await publishPackage(packageFullPath);
-        await deployPackage(packageFullPath, environmentId, rollback);
+        packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        core.setOutput('darPackagePath', packageRelativePath);
+        packageFullPath = path.join(process.cwd(), packageRelativePath);
+        packageId = await publishPackage(packageFullPath);
+        core.setOutput('packageId', packageId);
+        await deployPackage(packageId, environmentId, rollback);
         break;
 
       default:

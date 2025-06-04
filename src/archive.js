@@ -75,8 +75,13 @@ class Archive {
 
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
+            
+            const relativePath = path.relative(process.cwd(), packageFullPath);
+            const packageRelativePath = relativePath.startsWith(path.sep)? relativePath : path.sep + relativePath;
 
-            return packageFullPath;
+            console.log(`Package relative path: ${packageRelativePath}`);
+
+            return packageRelativePath;
         } catch (error) {
             console.error("Error creating package:", error);
             throw error;
