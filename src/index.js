@@ -108,6 +108,11 @@ async function run() {
     }
   } catch (error) {
     core.setFailed(error.message);
+    core.summary
+      .addHeading('🚨Action Failed')
+      .addSeparator()
+      .addCodeBlock(error.stack || error.message)
+      .write();
   }
 }
 
