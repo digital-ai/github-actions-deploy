@@ -3,10 +3,9 @@ const path = require("path");
 const fs = require("fs");
 const Archive = require('./archive');
 const DeployManager = require('./deploy-manager');
-const Util = require('./util');
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
-  
+
   if (!manifestPath.endsWith(".xml")) {
     throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
   }
@@ -16,29 +15,9 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
     throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
   core.info(`Manifest full path: ${manifestFullPath}`);
-
-  const rootPath = process.cwd();
-  const tmpDir = path.join(rootPath, 'tmp-dai');
-  if (fs.existsSync(tmpDir)) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-  fs.mkdirSync(tmpDir);
-
-  const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
-  fs.copyFileSync(manifestFullPath, tmpManifestPath);
-  core.info(`Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
-
   const outputFullPath = path.join(process.cwd(), outputPath);
-  core.info(`Output full path for package: ${outputFullPath}`);
+  return Archive.createNewDarPackage(manifestFullPath, outputFullPath, packageName, versionNumber);
 
-
-
-  if (versionNumber) {
-    Util.setVersion(tmpManifestPath, versionNumber);
-    core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
-  }
-
-  return Archive.createNewDarPackage(tmpManifestPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
@@ -83,7 +62,29 @@ async function run() {
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback') || 'false';
 
+    function logNonEmptyInputs() {
+      const inputs = {
+        serverUrl,
+        manifestPath,
+        outputPath,
+        packageName,
+        versionNumber,
+        darPackagePath: darPackagePathInput,
+        deploymentPackageId: deploymentPackageIdInput,
+        environmentId,
+        rollback
+      };
+
+      core.info('Provided action inputs:');
+      for (const [key, value] of Object.entries(inputs)) {
+        if (value) {
+          core.info(`${key}: ${value}`);
+        }
+      }
+    }
+
     core.info(`Action requested: ${action}`);
+    logNonEmptyInputs();
 
     // Validate core server connection inputs
     if (!serverUrl || !username || !password) {
@@ -92,10 +93,10 @@ async function run() {
 
     // Set server configuration for DeployManager
     DeployManager.serverConfig = { url: serverUrl, username: username, password: password };
-    core.info(`Server URL: ${serverUrl}`);
 
     // Verify connection to Digital.ai Deploy server
     core.info('Verifying connection to Digital.ai Deploy server...');
+    
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
@@ -112,35 +113,31 @@ async function run() {
     };
 
     let packageRelativePath, packageFullPath, deploymentPackageId;
+
     switch (action) {
-      
+
       case ACTIONS.CREATE:
         validateInputs(['manifestPath', 'outputPath']);
-        core.info(`Inputs for 'create' action: manifestPath=${manifestPath}, outputPath=${outputPath}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
         break;
 
       case ACTIONS.PUBLISH:
         validateInputs(['darPackagePath']);
-        core.info(`Inputs for 'publish' action: darPackagePath=${darPackagePathInput}`);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
         break
-      
-        case ACTIONS.DEPLOY:
+
+      case ACTIONS.DEPLOY:
         validateInputs(['deploymentPackageId', 'environmentId']);
-        core.info(`Inputs for 'deploy' action: deploymentPackageId=${deploymentPackageIdInput}, environmentId=${environmentId}`);
         await deployPackage(deploymentPackageIdInput, environmentId, rollback);
         break;
 
       case ACTIONS.CREATE_PUBLISH:
         validateInputs(['manifestPath', 'outputPath']);
-        core.info(`Inputs for 'create_publish' action: manifestPath=${manifestPath}, outputPath=${outputPath}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
-
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
@@ -148,32 +145,27 @@ async function run() {
 
       case ACTIONS.PUBLISH_DEPLOY:
         validateInputs(['darPackagePath', 'environmentId']);
-        core.info(`Inputs for 'publish_deploy' action: darPackagePath=${darPackagePathInput}, environmentId=${environmentId}`);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId); 
-
+        core.setOutput('deploymentPackageId', deploymentPackageId);
         await deployPackage(deploymentPackageId, environmentId, rollback);
         break;
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
-        core.info(`Inputs for 'create_publish_deploy' action: manifestPath=${manifestPath} outputPath=${outputPath} environmentId=${environmentId}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
-
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
-
-        await deployPackage(deploymentPackageId, environmentId, rollback); 
+        await deployPackage(deploymentPackageId, environmentId, rollback);
         break;
 
       default:
         throw new Error(`Invalid action: ${action}. Supported actions are: ${Object.values(ACTIONS).join(', ')}.`);
     }
   } catch (error) {
-    
+
     core.error(error.stack);
     core.setFailed(error.message);
     core.summary

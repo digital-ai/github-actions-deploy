@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
 const Util = require('./util');
-const Zip = require('./zip');
 
 class DeployManager {
 

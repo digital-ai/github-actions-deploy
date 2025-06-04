@@ -3,6 +3,7 @@ const archiver = require("archiver");
 const fs = require("fs");
 const path = require("path");
 const xml2js = require("xml2js");
+const Util = require('./util');
 
 class Archive {
     // Parse the manifest XML file and extract paths of files to be included in the package
@@ -39,24 +40,47 @@ class Archive {
     }
 
     // Create a new DAR package using the manifest file
-    static async createNewDarPackage(manifestPath, outputPath, packageName) {
+    static async createNewDarPackage(manifestPath, outputPath, packageName, versionNumber) {
         try {
-           
+
+            const rootPath = process.cwd();
+            const tmpDir = path.join(rootPath, 'tmp-dai');
+            if (fs.existsSync(tmpDir)) {
+                core.info(`Temporary directory already exists: ${tmpDir}. Removing it...`);
+                fs.rmSync(tmpDir, { recursive: true, force: true });
+            }
+            core.info(`Creating temporary directory for manifest : ${tmpDir}`);
+            fs.mkdirSync(tmpDir);
+
+            const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
+            fs.copyFileSync(manifestPath, tmpManifestPath);
+            core.info(`Copied original manifest from '${manifestPath}' to temporary manifest at '${tmpManifestPath}'`);
+
+            if (versionNumber) {
+                Util.setVersion(tmpManifestPath, versionNumber);
+                core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
+            }else {
+                core.info(`No version number provided, skipping version update in manifest at '${tmpManifestPath}'`);   
+            }
+            
             // Create the output directory if it doesn't exist
-            if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
-                console.log(`Output path not found, creating folder structure: ${outputPath}`);
+            if (!fs.existsSync(outputPath)) {
+                core.info(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
+            }else {
+                core.info(`Output path already exists: ${outputPath}`); 
             }
 
             // Set the package name, ensuring it ends with .dar
             if (!packageName) {
+                core.info("No package name provided, using default 'package.dar'");
                 packageName = "package.dar";
             } else if (!packageName.toLowerCase().endsWith(".dar")) {
                 packageName = packageName + ".dar";
             }
 
-            var packageFullPath = path.join(outputPath, packageName);
-            console.log(`Package path set: ${packageFullPath}`);
+            const packageFullPath = path.join(outputPath, packageName);
+            core.info(`Package path set: ${packageFullPath}`);
 
             // Throw an error if a package already exists at the target path
             if (fs.existsSync(packageFullPath)) {
@@ -64,20 +88,20 @@ class Archive {
             }
 
             const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
-            console.log(`Files to include in the package = ${filesToInclude}`);
+            core.info(`Files to include in the package = ${filesToInclude}`);
 
-            const rootPath = process.cwd();
+            core.info('Creating DAR package with the following parameters:');
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
-            console.log("Package created at:", packageFullPath);
-            
-            const relativePath = path.relative(process.cwd(), packageFullPath);
-            const packageRelativePath = relativePath.startsWith(path.sep)? relativePath : path.sep + relativePath;
+            core.info(`Package created at: ${packageFullPath}`);
 
-            console.log(`Package relative path: ${packageRelativePath}`);
+            const relativePath = path.relative(process.cwd(), packageFullPath);
+            const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
+
+            core.info(`Package relative path: ${packageRelativePath}`);
 
             return packageRelativePath;
         } catch (error) {
-            core.info("\n Error in creating the DAR package....");
+            core.info("Error in creating the DAR package....");
             throw error;
         }
     }
@@ -91,14 +115,14 @@ class Archive {
 
         for (const entry of filesToInclude) {
             let fullyEntryPath;
-            
+
             if (entry === "deployit-manifest.xml") {
-                fullyEntryPath = path.join(rootPath, "tmp-dai" , entry);
-            }else {
+                fullyEntryPath = path.join(rootPath, "tmp-dai", entry);
+            } else {
                 fullyEntryPath = path.join(rootPath, entry);
             }
-            console.log(`Adding entry: ${entry} from path: ${fullyEntryPath}`);
-            
+            core.info(`Adding entry: ${entry} from path: ${fullyEntryPath}`);
+
             if (!fs.existsSync(fullyEntryPath)) {
                 throw new Error(`File not found: ${fullyEntryPath}`);
             }
