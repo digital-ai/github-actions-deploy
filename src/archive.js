@@ -1,3 +1,4 @@
+const core = require('@actions/core');
 const archiver = require("archiver");
 const fs = require("fs");
 const path = require("path");
@@ -65,6 +66,7 @@ class Archive {
             const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
             console.log(`Files to include in the package = ${filesToInclude}`);
 
+            //const rootPath = process.cwd();
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             console.log("Package created at:", packageFullPath);
             
@@ -75,7 +77,7 @@ class Archive {
 
             return packageRelativePath;
         } catch (error) {
-            console.error("Error creating package:", error);
+            core.info("Error in creating the DAR package....");
             throw error;
         }
     }

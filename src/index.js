@@ -15,7 +15,7 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (!fs.existsSync(manifestFullPath)) {
     throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
-  core.debug(`Manifest full path: ${manifestFullPath}`);
+  core.info(`Manifest full path: ${manifestFullPath}`);
 
   const rootPath = process.cwd();
   const tmpDir = path.join(rootPath, 'tmp-dai');
@@ -26,16 +26,16 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 
   const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
   fs.copyFileSync(manifestFullPath, tmpManifestPath);
-  core.debug(`Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
+  core.info(`Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
 
   const outputFullPath = path.join(process.cwd(), outputPath);
-  core.debug(`Output full path for package: ${outputFullPath}`);
+  core.info(`Output full path for package: ${outputFullPath}`);
 
 
 
   if (versionNumber) {
     Util.setVersion(tmpManifestPath, versionNumber);
-    core.debug(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
+    core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
   }
 
   return Archive.createNewDarPackage(tmpManifestPath, outputFullPath, packageName);
@@ -92,7 +92,7 @@ async function run() {
 
     // Set server configuration for DeployManager
     DeployManager.serverConfig = { url: serverUrl, username: username, password: password };
-    core.debug(`Server URL: ${serverUrl}`);
+    core.info(`Server URL: ${serverUrl}`);
 
     // Verify connection to Digital.ai Deploy server
     core.info('Verifying connection to Digital.ai Deploy server...');
@@ -174,6 +174,7 @@ async function run() {
     }
   } catch (error) {
     
+    core.error(error.stack);
     core.setFailed(error.message);
     core.summary
       .addHeading('🚨Action Failed')
