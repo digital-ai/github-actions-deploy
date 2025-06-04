@@ -66079,7 +66079,8 @@ class Archive {
             }else {
                 fullyEntryPath = path.join(rootPath, entry);
             }
-            console
+            console.log(`Adding entry: ${entry} from path: ${fullyEntryPath}`);
+            
             if (!fs.existsSync(fullyEntryPath)) {
                 throw new Error(`File not found: ${fullyEntryPath}`);
             }
