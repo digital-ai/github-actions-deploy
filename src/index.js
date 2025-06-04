@@ -15,7 +15,7 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   if (!fs.existsSync(manifestFullPath)) {
     throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
-  core.info(`\n Manifest full path: ${manifestFullPath}`);
+  core.info(`Manifest full path: ${manifestFullPath}`);
 
   const rootPath = process.cwd();
   const tmpDir = path.join(rootPath, 'tmp-dai');
@@ -26,16 +26,16 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 
   const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
   fs.copyFileSync(manifestFullPath, tmpManifestPath);
-  core.info(`\n Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
+  core.info(`Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
 
   const outputFullPath = path.join(process.cwd(), outputPath);
-  core.info(`\n Output full path for package: ${outputFullPath}`);
+  core.info(`Output full path for package: ${outputFullPath}`);
 
 
 
   if (versionNumber) {
     Util.setVersion(tmpManifestPath, versionNumber);
-    core.info(`\n Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
+    core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
   }
 
   return Archive.createNewDarPackage(tmpManifestPath, outputFullPath, packageName);
@@ -83,7 +83,7 @@ async function run() {
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback') || 'false';
 
-    core.info(`\n Action requested: ${action}`);
+    core.info(`Action requested: ${action}`);
 
     // Validate core server connection inputs
     if (!serverUrl || !username || !password) {
@@ -92,7 +92,7 @@ async function run() {
 
     // Set server configuration for DeployManager
     DeployManager.serverConfig = { url: serverUrl, username: username, password: password };
-    core.info(`\n Server URL: ${serverUrl}`);
+    core.info(`Server URL: ${serverUrl}`);
 
     // Verify connection to Digital.ai Deploy server
     core.info('Verifying connection to Digital.ai Deploy server...');
@@ -100,7 +100,7 @@ async function run() {
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
     } else {
-      core.info('\n Digital.ai Deploy server is running and credentials are validated.');
+      core.info('Digital.ai Deploy server is running and credentials are validated.');
     }
 
     const validateInputs = (requiredInputs) => {
@@ -158,7 +158,7 @@ async function run() {
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
-        core.info(`\n Inputs for 'create_publish_deploy' action: \n manifestPath=${manifestPath} \n outputPath=${outputPath} \n environmentId=${environmentId}`);
+        core.info(`Inputs for 'create_publish_deploy' action: manifestPath=${manifestPath} outputPath=${outputPath} environmentId=${environmentId}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
 

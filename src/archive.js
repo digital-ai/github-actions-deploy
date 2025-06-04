@@ -18,7 +18,7 @@ class Archive {
             });
         });
 
-        const filesToInclude = new Set([`${path.sep}tmp-dai${path.sep}deployit-manifest.xml`]);
+        const filesToInclude = new Set([`deployit-manifest.xml`]);
         const deployables = xml["udm.DeploymentPackage"].deployables;
 
         for (const deployable in deployables) {
@@ -90,7 +90,13 @@ class Archive {
         archive.pipe(output);
 
         for (const entry of filesToInclude) {
-            const fullyEntryPath = path.join(rootPath, entry);
+            let fullyEntryPath;
+            
+            if (entry == "deployit-manifest.xml") {
+                fullyEntryPath  = path.join(rootPath, path.sep + "tmp-dai" + path.sep + entry);
+            }else {
+                fullyEntryPath = path.join(rootPath, entry);
+            }
 
             if (fs.statSync(fullyEntryPath).isDirectory()) {
                 archive.directory(fullyEntryPath, entry);
