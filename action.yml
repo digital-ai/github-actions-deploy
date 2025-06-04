@@ -34,6 +34,9 @@ inputs:
   darPackagePath:
     description: 'The path to the DAR package.'
     required: false
+  deploymentPackageId:
+    description: 'The ID of the package to be deployed.'
+    required: false
   environmentId:
     description: 'ID of the target environment in Digital.ai Deploy.'
     required: false
@@ -42,7 +45,7 @@ inputs:
     required: false
 
 outputs:
-  packageId:
+  deploymentPackageId:
     description: 'The ID of the published package.' 
   darPackagePath:
     description: 'The relative path to the DAR package created by the action.'  

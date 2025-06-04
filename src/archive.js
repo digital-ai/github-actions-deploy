@@ -17,7 +17,7 @@ class Archive {
             });
         });
 
-        const filesToInclude = new Set(["deployit-manifest.xml"]);
+        const filesToInclude = new Set([`${path.sep}tmp-dai${path.sep}deployit-manifest.xml`]);
         const deployables = xml["udm.DeploymentPackage"].deployables;
 
         for (const deployable in deployables) {
@@ -40,15 +40,7 @@ class Archive {
     // Create a new DAR package using the manifest file
     static async createNewDarPackage(manifestPath, outputPath, packageName) {
         try {
-            const rootPath = process.cwd();
-            const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
-
-            // Copy the manifest file to the current working directory
-            if (fs.existsSync(manifestFileFullPath)) {
-                //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
-            }
-            fs.copyFileSync(manifestPath, manifestFileFullPath);
-
+           
             // Create the output directory if it doesn't exist
             if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);

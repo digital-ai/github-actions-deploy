@@ -65999,7 +65999,7 @@ class Archive {
             });
         });
 
-        const filesToInclude = new Set(["deployit-manifest.xml"]);
+        const filesToInclude = new Set([`${path.sep}tmp-dai${path.sep}deployit-manifest.xml`]);
         const deployables = xml["udm.DeploymentPackage"].deployables;
 
         for (const deployable in deployables) {
@@ -66022,15 +66022,7 @@ class Archive {
     // Create a new DAR package using the manifest file
     static async createNewDarPackage(manifestPath, outputPath, packageName) {
         try {
-            const rootPath = process.cwd();
-            const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
-
-            // Copy the manifest file to the current working directory
-            if (fs.existsSync(manifestFileFullPath)) {
-                //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
-            }
-            fs.copyFileSync(manifestPath, manifestFileFullPath);
-
+           
             // Create the output directory if it doesn't exist
             if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
                 console.log(`Output path not found, creating folder structure: ${outputPath}`);
@@ -66376,21 +66368,39 @@ const DeployManager = __nccwpck_require__(680);
 const Util = __nccwpck_require__(8793);
 
 async function createNewPackage(manifestPath, outputPath, packageName, versionNumber) {
+  
   if (!manifestPath.endsWith(".xml")) {
     throw new Error("Invalid manifest path: the path must have a '.xml' extension.");
   }
 
   const manifestFullPath = path.join(process.cwd(), manifestPath);
   if (!fs.existsSync(manifestFullPath)) {
-    throw new Error("manifest file does not exist.");
+    throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
+  core.debug(`Manifest full path: ${manifestFullPath}`);
+
+  const rootPath = process.cwd();
+  const tmpDir = path.join(rootPath, 'tmp-dai');
+  if (fs.existsSync(tmpDir)) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(tmpDir);
+
+  const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
+  fs.copyFileSync(manifestFullPath, tmpManifestPath);
+  core.debug(`Copied original manifest from '${manifestFullPath}' to temporary manifest at '${tmpManifestPath}'`);
 
   const outputFullPath = path.join(process.cwd(), outputPath);
+  core.debug(`Output full path for package: ${outputFullPath}`);
+
+
+
   if (versionNumber) {
-    Util.setVersion(manifestFullPath, versionNumber);
+    Util.setVersion(tmpManifestPath, versionNumber);
+    core.debug(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
   }
 
-  return Archive.createNewDarPackage(manifestFullPath, outputFullPath, packageName);
+  return Archive.createNewDarPackage(tmpManifestPath, outputFullPath, packageName);
 }
 
 async function publishPackage(packageFullPath) {
@@ -66399,18 +66409,28 @@ async function publishPackage(packageFullPath) {
   }
 
   if (!fs.existsSync(packageFullPath)) {
-    throw new Error("package dar file does not exist.");
+    throw new Error(`Package DAR file not found at: ${packageFullPath}`);
   }
 
   return DeployManager.publishPackage(packageFullPath);
 }
 
-async function deployPackage(packageId, targetEnvironment, rollback) {
-  return DeployManager.deployPackage(packageId, targetEnvironment, rollback);
+async function deployPackage(deploymentPackageId, targetEnvironment, rollback) {
+  return DeployManager.deployPackage(deploymentPackageId, targetEnvironment, rollback);
 }
 
 async function run() {
   try {
+    // Define action constants for better readability and to prevent typos    
+    const ACTIONS = {
+      CREATE: 'create',
+      PUBLISH: 'publish',
+      DEPLOY: 'deploy',
+      CREATE_PUBLISH: 'create_publish',
+      PUBLISH_DEPLOY: 'publish_deploy',
+      CREATE_PUBLISH_DEPLOY: 'create_publish_deploy'
+    };
+
     // Read all inputs
     const action = core.getInput('action') || 'create_publish_deploy';
     const serverUrl = core.getInput('serverUrl').replace(/\/$/, ''); // Remove trailing '/'
@@ -66420,70 +66440,102 @@ async function run() {
     const outputPath = core.getInput('outputPath');
     const packageName = core.getInput('packageName');
     const versionNumber = core.getInput('versionNumber');
-    const darPackagePath = core.getInput('darPackagePath');
+    const darPackagePathInput = core.getInput('darPackagePath'); // Renamed to avoid conflict with local variable
+    const deploymentPackageIdInput = core.getInput('deploymentPackageId'); // Renamed to avoid conflict with local variable
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback') || 'false';
-    let packageFullPath = '';
 
+    core.info(`Action requested: ${action}`);
+
+    // Validate core server connection inputs
     if (!serverUrl || !username || !password) {
-      throw new Error('serverUrl, username, and password are required.');
+      throw new Error('serverUrl, username, and password are required for all actions.');
     }
 
-    const serverConfig = {
-      url: serverUrl,
-      username: username,
-      password: password
-    };
+    // Set server configuration for DeployManager
+    DeployManager.serverConfig = { url: serverUrl, username: username, password: password };
+    core.debug(`Server URL: ${serverUrl}`);
 
-    DeployManager.serverConfig = serverConfig;
-
+    // Verify connection to Digital.ai Deploy server
+    core.info('Verifying connection to Digital.ai Deploy server...');
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
     } else {
-      console.log('Digital.ai Deploy server is running and credentials are validated.');
+      core.info('Digital.ai Deploy server is running and credentials are validated.');
     }
 
     const validateInputs = (requiredInputs) => {
       requiredInputs.forEach(input => {
         if (!core.getInput(input)) {
-          throw new Error(`${input} is required for action '${action}'.`);
+          throw new Error(`Input '${input}' is required for action '${action}'.`);
         }
       });
     };
 
+    let packageRelativePath, packageFullPath, deploymentPackageId;
     switch (action) {
-      case 'create_publish':
+      
+      case ACTIONS.CREATE:
         validateInputs(['manifestPath', 'outputPath']);
+        core.info(`Inputs for 'create' action: manifestPath=${manifestPath}, outputPath=${outputPath}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
-        packageFullPath = path.join(process.cwd(), packageRelativePath);
-        packageId = await publishPackage(packageFullPath);
-        core.setOutput('packageId', packageId);
         break;
 
-      case 'publish_deploy':
+      case ACTIONS.PUBLISH:
+        validateInputs(['darPackagePath']);
+        core.info(`Inputs for 'publish' action: darPackagePath=${darPackagePathInput}`);
+        packageFullPath = path.join(process.cwd(), darPackagePathInput);
+        deploymentPackageId = await publishPackage(packageFullPath);
+        core.setOutput('deploymentPackageId', deploymentPackageId);
+        break
+      
+        case ACTIONS.DEPLOY:
+        validateInputs(['deploymentPackageId', 'environmentId']);
+        core.info(`Inputs for 'deploy' action: deploymentPackageId=${deploymentPackageIdInput}, environmentId=${environmentId}`);
+        await deployPackage(deploymentPackageIdInput, environmentId, rollback);
+        break;
+
+      case ACTIONS.CREATE_PUBLISH:
+        validateInputs(['manifestPath', 'outputPath']);
+        core.info(`Inputs for 'create_publish' action: manifestPath=${manifestPath}, outputPath=${outputPath}`);
+        packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
+        core.setOutput('darPackagePath', packageRelativePath);
+
+        packageFullPath = path.join(process.cwd(), packageRelativePath);
+        deploymentPackageId = await publishPackage(packageFullPath);
+        core.setOutput('deploymentPackageId', deploymentPackageId);
+        break;
+
+      case ACTIONS.PUBLISH_DEPLOY:
         validateInputs(['darPackagePath', 'environmentId']);
-        packageFullPath = path.join(process.cwd(), darPackagePath);
-        packageId = await publishPackage(packageFullPath);
-        core.setOutput('packageId', packageId);
-        await deployPackage(packageId, environmentId, rollback);
+        core.info(`Inputs for 'publish_deploy' action: darPackagePath=${darPackagePathInput}, environmentId=${environmentId}`);
+        packageFullPath = path.join(process.cwd(), darPackagePathInput);
+        deploymentPackageId = await publishPackage(packageFullPath);
+        core.setOutput('deploymentPackageId', deploymentPackageId); 
+
+        await deployPackage(deploymentPackageId, environmentId, rollback);
         break;
 
-      case 'create_publish_deploy':
+      case ACTIONS.CREATE_PUBLISH_DEPLOY:
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
+        core.info(`Inputs for 'create_publish_deploy' action: manifestPath=${manifestPath}, outputPath=${outputPath}, environmentId=${environmentId}`);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
         core.setOutput('darPackagePath', packageRelativePath);
+
         packageFullPath = path.join(process.cwd(), packageRelativePath);
-        packageId = await publishPackage(packageFullPath);
-        core.setOutput('packageId', packageId);
-        await deployPackage(packageId, environmentId, rollback);
+        deploymentPackageId = await publishPackage(packageFullPath);
+        core.setOutput('deploymentPackageId', deploymentPackageId);
+
+        await deployPackage(deploymentPackageId, environmentId, rollback); 
         break;
 
       default:
-        throw new Error(`Invalid action: ${action}. Supported actions are: create_publish, publish_deploy, create_publish_deploy.`);
+        throw new Error(`Invalid action: ${action}. Supported actions are: ${Object.values(ACTIONS).join(', ')}.`);
     }
   } catch (error) {
+    
     core.setFailed(error.message);
     core.summary
       .addHeading('🚨Action Failed')
@@ -66508,28 +66560,6 @@ const fs = __nccwpck_require__(9896);
 const xml2js = __nccwpck_require__(758);
 
 class Util {
-
-    // Get version from manifest file
-    static async getVersionFromManifest(manifestPath) {
-        const text = fs.readFileSync(manifestPath, "utf8");
-        return await Util.getVersion(text);
-    }
-
-    // Get version from manifest content
-    static async getVersion(manifest) {
-        const xml = await this.xml2json(manifest);
-
-        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
-        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
-
-        if (udmDeploymentPackageElement) {
-            return udmDeploymentPackageElement.$.version;
-        } else if (udmProvisioningPackageElement) {
-            return udmProvisioningPackageElement.$.version;
-        } else {
-            throw new Error("Content is not a valid manifest content.");
-        }
-    }
 
     // Check if input string starts with a specific value
     static startsWith(inputString, value, ignoreCase) {
@@ -66560,35 +66590,7 @@ class Util {
 
         const builder = new xml2js.Builder();
         fs.writeFileSync(manifestPath, builder.buildObject(xml), "utf8");
-    }
-
-    // Get application from manifest file
-    static async getApplicationFromManifest(manifestPath) {
-        const manifest = fs.readFileSync(manifestPath, "utf8");
-        return await Util.getApplication(manifest);
-    }
-
-    // Get application from manifest content
-    static async getApplication(manifest) {
-        const xml = await this.xml2json(manifest);
-
-        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
-        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
-
-        if (udmDeploymentPackageElement) {
-            return udmDeploymentPackageElement.$.application.trim();
-        } else if (udmProvisioningPackageElement) {
-            return udmProvisioningPackageElement.$.application.trim();
-        } else {
-            throw new Error(`Content is not a valid manifest content.`);
-        }
-    }
-
-    // Get application name from manifest file
-    static async getApplicationNameFromManifest(manifestPath) {
-        const application = await this.getApplicationFromManifest(manifestPath);
-        const splitPath = application.split("/");
-        return splitPath[splitPath.length - 1];
+        
     }
 
     // Convert XML to JSON
