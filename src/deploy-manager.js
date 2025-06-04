@@ -42,7 +42,7 @@ class DeployManager {
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
     console.log(`Package ${packageName} published successfully!`);
-    console.log(typeof response);
+    console.log(`Response: ${JSON.stringify(response)}`);
     return response;
   }
 
