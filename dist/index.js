@@ -66074,10 +66074,14 @@ class Archive {
         for (const entry of filesToInclude) {
             let fullyEntryPath;
             
-            if (entry == "deployit-manifest.xml") {
-                fullyEntryPath  = path.join(rootPath, path.sep + "tmp-dai" + path.sep + entry);
+            if (entry === "deployit-manifest.xml") {
+                fullyEntryPath = path.join(rootPath, "tmp-dai" , entry);
             }else {
                 fullyEntryPath = path.join(rootPath, entry);
+            }
+            console
+            if (!fs.existsSync(fullyEntryPath)) {
+                throw new Error(`File not found: ${fullyEntryPath}`);
             }
 
             if (fs.statSync(fullyEntryPath).isDirectory()) {
