@@ -97,7 +97,7 @@ class Archive {
             const relativePath = path.relative(process.cwd(), packageFullPath);
             const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
 
-            core.info(`Package relative path: ${packageRelativePath}`);
+            //core.info(`Package relative path: ${packageRelativePath}`);
 
             return packageRelativePath;
         } catch (error) {

@@ -64862,7 +64862,7 @@ class Archive {
             const relativePath = path.relative(process.cwd(), packageFullPath);
             const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
 
-            core.info(`Package relative path: ${packageRelativePath}`);
+            //core.info(`Package relative path: ${packageRelativePath}`);
 
             return packageRelativePath;
         } catch (error) {
@@ -64914,6 +64914,7 @@ module.exports = Archive;
 /***/ 680:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+const core = __nccwpck_require__(7484);
 const axios = __nccwpck_require__(7269);
 const fs = __nccwpck_require__(9896);
 const path = __nccwpck_require__(6928);
@@ -64973,20 +64974,26 @@ class DeployManager {
   }
 
   // Deploy a package
-  static async deployPackage(deploymentPackageId, targetEnvironment, rollback) {
+  static async deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl) {
     if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
 
     if (!await this.environmentExists(targetEnvironment)) {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
+    } else {
+      console.log(`Environment ${targetEnvironment} exists.`);
     }
 
-    console.log(`Package Id is ${deploymentPackageId}`);
-    console.log(`Starting deployment to ${targetEnvironment}.`);
+    console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
-    console.log(`New deployment task has been successfully created with id ${deploymentId}.`);
+    console.log(`New deployment task has been successfully created with id ${deploymentId}`);
+
+
+    core.summary
+      .addHeading('🚀 Deployment Report')
+      .addLink('View deployment details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${deploymentPackageId}`)
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -65005,16 +65012,20 @@ class DeployManager {
 
       console.log("Starting rollback.");
       const rollbackTaskId = await this.createRollbackTask(deploymentId);
+      console.log(`Rollback task created with id ${rollbackTaskId}.`);
+      core.summary
+        .addLink('View rollback details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`);
+
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
-        console.log("Deployment failed - Rollback executed successfully.");
-        throw new Error("Deployment failed - Rollback executed successfully.");
+        console.log("Deployment failed - Rollback executed successfully");
+        throw new Error("Deployment failed - Rollback executed successfully");
       } else {
-        throw new Error("Rollback failed.");
+        throw new Error("Rollback failed");
       }
     }
   }
@@ -65213,8 +65224,8 @@ async function publishPackage(packageFullPath) {
   return DeployManager.publishPackage(packageFullPath);
 }
 
-async function deployPackage(deploymentPackageId, targetEnvironment, rollback) {
-  return DeployManager.deployPackage(deploymentPackageId, targetEnvironment, rollback);
+async function deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl) {
+  return DeployManager.deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl);
 }
 
 async function run() {
@@ -65312,7 +65323,7 @@ async function run() {
 
       case ACTIONS.DEPLOY:
         validateInputs(['deploymentPackageId', 'environmentId']);
-        await deployPackage(deploymentPackageIdInput, environmentId, rollback);
+        await deployPackage(deploymentPackageIdInput, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH:
@@ -65329,7 +65340,7 @@ async function run() {
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
-        await deployPackage(deploymentPackageId, environmentId, rollback);
+        await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
@@ -65339,7 +65350,7 @@ async function run() {
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
-        await deployPackage(deploymentPackageId, environmentId, rollback);
+        await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       default:
@@ -65354,6 +65365,9 @@ async function run() {
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
       .write();
+  }
+  finally {
+    await core.summary.write();
   }
 }
 

@@ -1,3 +1,4 @@
+const core = require('@actions/core');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -57,20 +58,26 @@ class DeployManager {
   }
 
   // Deploy a package
-  static async deployPackage(deploymentPackageId, targetEnvironment, rollback) {
+  static async deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl) {
     if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
 
     if (!await this.environmentExists(targetEnvironment)) {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
+    } else {
+      console.log(`Environment ${targetEnvironment} exists.`);
     }
 
-    console.log(`Package Id is ${deploymentPackageId}`);
-    console.log(`Starting deployment to ${targetEnvironment}.`);
+    console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
-    console.log(`New deployment task has been successfully created with id ${deploymentId}.`);
+    console.log(`New deployment task has been successfully created with id ${deploymentId}`);
+
+
+    core.summary
+      .addHeading('🚀 Deployment Report')
+      .addLink('View deployment details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${deploymentPackageId}`)
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -89,16 +96,20 @@ class DeployManager {
 
       console.log("Starting rollback.");
       const rollbackTaskId = await this.createRollbackTask(deploymentId);
+      console.log(`Rollback task created with id ${rollbackTaskId}.`);
+      core.summary
+        .addLink('View rollback details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`);
+
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
-        console.log("Deployment failed - Rollback executed successfully.");
-        throw new Error("Deployment failed - Rollback executed successfully.");
+        console.log("Deployment failed - Rollback executed successfully");
+        throw new Error("Deployment failed - Rollback executed successfully");
       } else {
-        throw new Error("Rollback failed.");
+        throw new Error("Rollback failed");
       }
     }
   }

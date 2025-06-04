@@ -32,8 +32,8 @@ async function publishPackage(packageFullPath) {
   return DeployManager.publishPackage(packageFullPath);
 }
 
-async function deployPackage(deploymentPackageId, targetEnvironment, rollback) {
-  return DeployManager.deployPackage(deploymentPackageId, targetEnvironment, rollback);
+async function deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl) {
+  return DeployManager.deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl);
 }
 
 async function run() {
@@ -131,7 +131,7 @@ async function run() {
 
       case ACTIONS.DEPLOY:
         validateInputs(['deploymentPackageId', 'environmentId']);
-        await deployPackage(deploymentPackageIdInput, environmentId, rollback);
+        await deployPackage(deploymentPackageIdInput, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH:
@@ -148,7 +148,7 @@ async function run() {
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
-        await deployPackage(deploymentPackageId, environmentId, rollback);
+        await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
@@ -158,7 +158,7 @@ async function run() {
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
         core.setOutput('deploymentPackageId', deploymentPackageId);
-        await deployPackage(deploymentPackageId, environmentId, rollback);
+        await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       default:
@@ -173,6 +173,9 @@ async function run() {
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
       .write();
+  }
+  finally {
+    await core.summary.write();
   }
 }
 
