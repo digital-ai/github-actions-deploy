@@ -86,6 +86,8 @@ class DeployManager {
     core.setOutput('deploymentTaskId', deploymentTaskId);
     core.summary
       .addHeading('Deployment Summary')
+      .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
+      .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
       .addRaw(`Deployment task Id: <i>${deploymentTaskId}</i><br/>`)
       .addLink(
         'View deployment details in Digital.ai Deploy UI',
@@ -116,6 +118,8 @@ class DeployManager {
       core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
         .addHeading('Rollback Summary')
+        .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
+        .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
         .addRaw(`Rollback task Id: <i>${rollbackTaskId}</i><br/>`)
         .addLink(
           'View rollback details in Digital.ai Deploy UI',

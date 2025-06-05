@@ -64824,16 +64824,16 @@ class Archive {
             if (versionNumber) {
                 Util.setVersion(tmpManifestPath, versionNumber);
                 core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
-            }else {
-                core.info(`No version number provided, skipping version update in manifest at '${tmpManifestPath}'`);   
+            } else {
+                core.info(`No version number provided, skipping version update in manifest at '${tmpManifestPath}'`);
             }
-            
+
             // Create the output directory if it doesn't exist
             if (!fs.existsSync(outputPath)) {
                 core.info(`Output path not found, creating folder structure: ${outputPath}`);
                 fs.mkdirSync(outputPath, { recursive: true });
-            }else {
-                core.info(`Output path already exists: ${outputPath}`); 
+            } else {
+                core.info(`Output path already exists: ${outputPath}`);
             }
 
             // Set the package name, ensuring it ends with .dar
@@ -64865,9 +64865,12 @@ class Archive {
             core.setOutput('darPackagePath', packageRelativePath);
             core.summary
                 .addHeading("Package Creation Summary")
-                .addRaw(`Package name: <i>${packageName}</i><br/>`)
-                .addRaw(`Package version: <i>${versionNumber || 'taken from input manifest file'}</i><br/>`)
-                .addRaw(`Package created successfully at <i>${packageRelativePath}</i><br/>`)
+                .addList([
+                    `Input manifest full path: <i>${manifestPath}</i>`,
+                    `Package name: <i>${packageName}</i>`,
+                    `Package version: <i>${versionNumber || 'taken from input manifest file'}</i>`,
+                    `Package created successfully at <i>${packageRelativePath}</i><br/>`
+                ], false) 
                 .write();
 
             return packageRelativePath;
@@ -65008,6 +65011,8 @@ class DeployManager {
     core.setOutput('deploymentTaskId', deploymentTaskId);
     core.summary
       .addHeading('Deployment Summary')
+      .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
+      .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
       .addRaw(`Deployment task Id: <i>${deploymentTaskId}</i><br/>`)
       .addLink(
         'View deployment details in Digital.ai Deploy UI',
@@ -65038,6 +65043,8 @@ class DeployManager {
       core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
         .addHeading('Rollback Summary')
+        .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
+        .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
         .addRaw(`Rollback task Id: <i>${rollbackTaskId}</i><br/>`)
         .addLink(
           'View rollback details in Digital.ai Deploy UI',
