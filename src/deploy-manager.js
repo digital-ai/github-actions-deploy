@@ -77,7 +77,7 @@ class DeployManager {
 
     core.summary
       .addHeading('🚀 Deployment Report')
-      .addLink('View deployment details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${deploymentPackageId}`)
+      .addLink('View deployment details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${deploymentId}`)
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -85,7 +85,7 @@ class DeployManager {
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
       // Archive the deployment task
       await this.archiveDeploymentTask(deploymentId);
-      console.log(`Successfully deployed to ${targetEnvironment}.`);
+      console.log(`Successfully deployed to ${targetEnvironment}`);
     } else {
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
