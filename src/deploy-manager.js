@@ -78,7 +78,7 @@ class DeployManager {
     console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
     const deploymentTaskId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
-    console.log(`New deployment task has been successfully created with id ${deploymentId}`);
+    console.log(`New deployment task has been successfully created with id ${deploymentTaskId}`);
 
     const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
 
@@ -89,12 +89,12 @@ class DeployManager {
       .addRaw(`Deployment task Id: ${deploymentTaskId}<br/>`)
       .write();
 
-    await this.startDeploymentTask(deploymentId);
-    const taskOutcome = await this.waitForTask(deploymentId);
+    await this.startDeploymentTask(deploymentTaskId);
+    const taskOutcome = await this.waitForTask(deploymentTaskId);
 
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
       // Archive the deployment task
-      await this.archiveDeploymentTask(deploymentId);
+      await this.archiveDeploymentTask(deploymentTaskId);
       console.log(`Successfully deployed to ${targetEnvironment}`);
     } else {
       if (taskOutcome === "FAILED") {
@@ -105,7 +105,7 @@ class DeployManager {
       }
 
       console.log("Starting rollback process...");
-      const rollbackTaskId = await this.createRollbackTask(deploymentId);
+      const rollbackTaskId = await this.createRollbackTask(deploymentTaskId);
       console.log(`Rollback task created with id ${rollbackTaskId}`);
 
       const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
