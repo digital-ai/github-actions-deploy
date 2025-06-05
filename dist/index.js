@@ -64970,9 +64970,11 @@ class DeployManager {
     core.setOutput('deploymentPackageId', response.id);
     core.summary
       .addHeading("Package Publish Summary")
-      .addRaw(`Package Full Path: <i>${packageFullPath}</i><br/>`)
-      .addRaw(`Package <i>${packageName}</i> published successfully!<br/>`)
-      .addRaw(`Package ID: <i>${response.id}</i><br/>`)
+      .addList([
+        `Package full path: <i>${packageFullPath}</i>`,
+        `Package <i>${packageName}</i> published successfully!<br/>`,
+        `Package ID: <i>${response.id}</i><br/>`
+      ], false)
       .write();
     return response.id;
   }
@@ -65011,14 +65013,12 @@ class DeployManager {
     core.setOutput('deploymentTaskId', deploymentTaskId);
     core.summary
       .addHeading('Deployment Summary')
-      .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
-      .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
-      .addRaw(`Deployment task Id: <i>${deploymentTaskId}</i><br/>`)
-      .addLink(
-        'View deployment details in Digital.ai Deploy UI',
-        deploymentUrl
-      )
-      .addRaw('<br/>')
+      .addList([
+        `Deployment package Id: <i>${deploymentPackageId}</i>`,
+        `Target environment: <i>${targetEnvironment}</i>`,
+        `Deployment task Id: <i>${deploymentTaskId}</i>`,
+        `[View deployment details in Digital.ai Deploy UI](${deploymentUrl})`
+      ], false)
       .write();
     await this.startDeploymentTask(deploymentTaskId);
     const taskOutcome = await this.waitForTask(deploymentTaskId);
@@ -65043,16 +65043,13 @@ class DeployManager {
       core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
         .addHeading('Rollback Summary')
-        .addRaw(`Deployment package Id: <i>${deploymentPackageId}</i>`)
-        .addRaw(`Target environment: <i>${targetEnvironment}</i>`)
-        .addRaw(`Rollback task Id: <i>${rollbackTaskId}</i><br/>`)
-        .addLink(
-          'View rollback details in Digital.ai Deploy UI',
-          rollbackUrl
-        )
-        .addRaw('<br/>')
+        .addList([
+          `Deployment package Id: <i>${deploymentPackageId}</i>`,
+          `Target environment: <i>${targetEnvironment}</i>`,
+          `Rollback task Id: <i>${rollbackTaskId}</i><br/>`,
+          `[View rollback details in Digital.ai Deploy UI](${rollbackUrl})`
+        ], false)
         .write();
-
 
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
