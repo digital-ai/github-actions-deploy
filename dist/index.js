@@ -65017,7 +65017,7 @@ class DeployManager {
         `Deployment package Id: <i>${deploymentPackageId}</i>`,
         `Target environment: <i>${targetEnvironment}</i>`,
         `Deployment task Id: <i>${deploymentTaskId}</i>`,
-        `[View deployment details in Digital.ai Deploy UI](${deploymentUrl})`
+        `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
       ], false)
       .write();
     await this.startDeploymentTask(deploymentTaskId);
@@ -65046,8 +65046,8 @@ class DeployManager {
         .addList([
           `Deployment package Id: <i>${deploymentPackageId}</i>`,
           `Target environment: <i>${targetEnvironment}</i>`,
-          `Rollback task Id: <i>${rollbackTaskId}</i><br/>`,
-          `[View rollback details in Digital.ai Deploy UI](${rollbackUrl})`
+          `Rollback task Id: <i>${rollbackTaskId}</i>`,
+          `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
         ], false)
         .write();
 
