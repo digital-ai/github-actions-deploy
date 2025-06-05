@@ -45,9 +45,9 @@ class DeployManager {
     core.setOutput('deploymentPackageId', response.id);
     core.summary
       .addHeading("Package Publish Summary")
-      .addRaw('Package Full Path: ' + packageFullPath + '<br/>')
-      .addRaw(`Package ${packageName} published successfully!<br/>`)
-      .addRaw(`Package ID: ${response.id}<br/>`)
+      .addRaw(`Package Full Path: *${packageFullPath}* <br/>`)
+      .addRaw(`Package *${packageName}* published successfully!<br/>`)
+      .addRaw(`Package ID: *${response.id}* <br/>`)
       .write();
     return response.id;
   }
@@ -85,11 +85,14 @@ class DeployManager {
 
     core.setOutput('deploymentTaskId', deploymentTaskId);
     core.summary
-      .addHeading(`Deployment Summary`)
-      .addRaw(`View deployment details in Digital.ai Deploy UI: ${deploymentUrl}<br/>`)
-      .addRaw(`Deployment task Id: ${deploymentTaskId}<br/>`)
+      .addHeading('Deployment Summary')
+      .addRaw(`Deployment task Id: *${deploymentTaskId}*<br/>`)
+      .addLink(
+        'View deployment details in Digital.ai Deploy UI',
+        deploymentUrl
+      )
+      .addRaw('<br/>')
       .write();
-
     await this.startDeploymentTask(deploymentTaskId);
     const taskOutcome = await this.waitForTask(deploymentTaskId);
 
@@ -112,10 +115,15 @@ class DeployManager {
       const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
       core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
-        .addHeading(`Rollback Summary`)
-        .addRaw(`View rollback details in Digital.ai Deploy UI: ${rollbackUrl}<br/>`)
-        .addRaw(`Rollback task Id : ${rollbackTaskId} <br/>`)
+        .addHeading('Rollback Summary')
+        .addRaw(`Rollback task Id: *${rollbackTaskId}*<br/>`)
+        .addLink(
+          'View rollback details in Digital.ai Deploy UI',
+          rollbackUrl
+        )
+        .addRaw('<br/>')
         .write();
+
 
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
