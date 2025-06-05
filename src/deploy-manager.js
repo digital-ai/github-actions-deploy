@@ -86,45 +86,58 @@ class DeployManager {
     const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
 
     core.setOutput('deploymentTaskId', deploymentTaskId);
-    core.summary
-      .addHeading('Deployment Summary')
-      .addList([
-        `Deployment package Id: <i>${deploymentPackageId}</i>`,
-        `Target environment: <i>${targetEnvironment}</i>`,
-        `Deployment task Id: <i>${deploymentTaskId}</i>`,
-        `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
-      ], false)
-      .write();
+
     await this.startDeploymentTask(deploymentTaskId);
     const taskOutcome = await this.waitForTask(deploymentTaskId);
 
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
       // Archive the deployment task
       await this.archiveDeploymentTask(deploymentTaskId);
+      const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
+      core.summary
+        .addHeading('Deployment Summary')
+        .addList([
+          `Deployment package Id: <i>${deploymentPackageId}</i>`,
+          `Target environment: <i>${targetEnvironment}</i>`,
+          `Deployment task Id: <i>${deploymentTaskId}</i>`,
+          `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+        ], false)
+        .write();
       console.log(`Successfully deployed to ${targetEnvironment}`);
     } else {
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
       if (rollback === 'false') {
+        const deploymentUrl = `${serverUrl}/#/explorer?taskId=${deploymentTaskId}`;
+        core.summary
+          .addHeading('Deployment Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Deployment task Id: <i>${deploymentTaskId}</i>`,
+            `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
         throw new Error("Deployment failed");
       }
+
+      const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
+      core.summary
+        .addHeading('Deployment Summary')
+        .addList([
+          `Deployment package Id: <i>${deploymentPackageId}</i>`,
+          `Target environment: <i>${targetEnvironment}</i>`,
+          `Deployment task Id: <i>${deploymentTaskId}</i>`,
+          `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+        ], false)
+        .write();
 
       console.log("Starting rollback process...");
       const rollbackTaskId = await this.createRollbackTask(deploymentTaskId);
       console.log(`Rollback task created with id ${rollbackTaskId}`);
-
-      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
       core.setOutput('rollbackTaskId', rollbackTaskId);
-      core.summary
-        .addHeading('Rollback Summary')
-        .addList([
-          `Deployment package Id: <i>${deploymentPackageId}</i>`,
-          `Target environment: <i>${targetEnvironment}</i>`,
-          `Rollback task Id: <i>${rollbackTaskId}</i>`,
-          `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
-        ], false)
-        .write();
+
 
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
@@ -132,9 +145,29 @@ class DeployManager {
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
+        const rollbackUrl = `${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`;
+        core.summary
+          .addHeading('Rollback Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Rollback task Id: <i>${rollbackTaskId}</i>`,
+            `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
         console.log("Deployment failed - Rollback executed successfully");
         throw new Error("Deployment failed - Rollback executed successfully");
       } else {
+        const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
+        core.summary
+          .addHeading('Rollback Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Rollback task Id: <i>${rollbackTaskId}</i>`,
+            `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
         throw new Error("Rollback failed");
       }
     }
