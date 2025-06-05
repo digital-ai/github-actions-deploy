@@ -64990,10 +64990,14 @@ class DeployManager {
     const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
     console.log(`New deployment task has been successfully created with id ${deploymentId}`);
 
+    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentId}`;
 
-    core.summary
-      .addHeading('🚀 Deployment Report')
-      .addLink('View deployment details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${deploymentId}`)
+      core.summary
+        .addRaw(
+          `<a href="${deploymentUrl}" target="_blank" rel="noopener noreferrer">
+           View deployment details in Digital.ai Deploy UI
+           </a><br/>`
+        )
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -65010,12 +65014,18 @@ class DeployManager {
         throw new Error("Deployment failed");
       }
 
-      console.log("Starting rollback.");
+      console.log("Starting rollback process...");
       const rollbackTaskId = await this.createRollbackTask(deploymentId);
-      console.log(`Rollback task created with id ${rollbackTaskId}.`);
-      core.summary
-        .addLink('View rollback details in Digital.ai Deploy UI', `http://${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`);
+      console.log(`Rollback task created with id ${rollbackTaskId}`);
+      
+      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
 
+      core.summary
+        .addRaw(
+          `<a href="${rollbackUrl}" target="_blank" rel="noopener noreferrer">
+           View rollback details in Digital.ai Deploy UI
+           </a><br/>`
+        )
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
@@ -65361,10 +65371,9 @@ async function run() {
     core.error(error.stack);
     core.setFailed(error.message);
     core.summary
-      .addHeading('🚨Action Failed')
+      .addHeading('Action Information')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-      .write();
   }
   finally {
     await core.summary.write();

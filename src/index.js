@@ -169,10 +169,9 @@ async function run() {
     core.error(error.stack);
     core.setFailed(error.message);
     core.summary
-      .addHeading('🚨Action Failed')
+      .addHeading('Action Information')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-      .write();
   }
   finally {
     await core.summary.write();
