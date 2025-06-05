@@ -64,7 +64,7 @@ Below is a comprehensive list of *mode-specific* inputs. Note that some inputs a
 
 | Name     | Description                                                                                                                                                      | Required | Default                     |
 |----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|-----------------------------|
-| `action` | Specifies which operation(s) to perform. Choose one of: <br/>• `create` <br/>• `publish` <br/>• `deploy` <br/>• `create_publish` <br/>• `publish_deploy` <br/>• `create_publish_deploy` | Yes      | `create_publish_deploy`     |
+| `action` | Specifies which operation(s) to perform. Choose one of: <br/>• `create` <br/>• `publish` <br/>• `deploy` <br/>• `create_publish` <br/>• `publish_deploy` <br/>• `create_publish_deploy` | No      | `create_publish_deploy`     |
 
 ---
 
