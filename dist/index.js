@@ -64865,9 +64865,9 @@ class Archive {
             core.setOutput('darPackagePath', packageRelativePath);
             core.summary
                 .addHeading("Package Creation Summary")
-                .addRaw(`Package name: *${packageName}* <br/>`)
-                .addRaw(`Package version: *${versionNumber || 'taken from input manifest file'}* <br/>`)
-                .addRaw(`Package created successfully at *${packageRelativePath}* <br/>`)
+                .addRaw(`Package name: <i>${packageName}</i><br/>`)
+                .addRaw(`Package version: <i>${versionNumber || 'taken from input manifest file'}</i><br/>`)
+                .addRaw(`Package created successfully at <i>${packageRelativePath}</i><br/>`)
                 .write();
 
             return packageRelativePath;
@@ -64967,9 +64967,9 @@ class DeployManager {
     core.setOutput('deploymentPackageId', response.id);
     core.summary
       .addHeading("Package Publish Summary")
-      .addRaw(`Package Full Path: *${packageFullPath}* <br/>`)
-      .addRaw(`Package *${packageName}* published successfully!<br/>`)
-      .addRaw(`Package ID: *${response.id}* <br/>`)
+      .addRaw(`Package Full Path: <i>${packageFullPath}</i><br/>`)
+      .addRaw(`Package <i>${packageName}</i> published successfully!<br/>`)
+      .addRaw(`Package ID: <i>${response.id}</i><br/>`)
       .write();
     return response.id;
   }
@@ -65008,7 +65008,7 @@ class DeployManager {
     core.setOutput('deploymentTaskId', deploymentTaskId);
     core.summary
       .addHeading('Deployment Summary')
-      .addRaw(`Deployment task Id: *${deploymentTaskId}*<br/>`)
+      .addRaw(`Deployment task Id: <i>${deploymentTaskId}</i><br/>`)
       .addLink(
         'View deployment details in Digital.ai Deploy UI',
         deploymentUrl
@@ -65038,7 +65038,7 @@ class DeployManager {
       core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
         .addHeading('Rollback Summary')
-        .addRaw(`Rollback task Id: *${rollbackTaskId}*<br/>`)
+        .addRaw(`Rollback task Id: <i>${rollbackTaskId}</i><br/>`)
         .addLink(
           'View rollback details in Digital.ai Deploy UI',
           rollbackUrl

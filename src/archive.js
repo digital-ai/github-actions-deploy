@@ -100,9 +100,9 @@ class Archive {
             core.setOutput('darPackagePath', packageRelativePath);
             core.summary
                 .addHeading("Package Creation Summary")
-                .addRaw(`Package name: *${packageName}* <br/>`)
-                .addRaw(`Package version: *${versionNumber || 'taken from input manifest file'}* <br/>`)
-                .addRaw(`Package created successfully at *${packageRelativePath}* <br/>`)
+                .addRaw(`Package name: <i>${packageName}</i><br/>`)
+                .addRaw(`Package version: <i>${versionNumber || 'taken from input manifest file'}</i><br/>`)
+                .addRaw(`Package created successfully at <i>${packageRelativePath}</i><br/>`)
                 .write();
 
             return packageRelativePath;
