@@ -64862,7 +64862,11 @@ class Archive {
             const relativePath = path.relative(process.cwd(), packageFullPath);
             const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
 
-            //core.info(`Package relative path: ${packageRelativePath}`);
+            core.setOutput('darPackagePath', packageRelativePath);
+            core.summary
+                .addHeading("DAR Package Created")
+                .addRaw(`Package created successfully at ${packageRelativePath} <br/>`)
+                .write();
 
             return packageRelativePath;
         } catch (error) {
@@ -64958,6 +64962,12 @@ class DeployManager {
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
     console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
+    core.setOutput('deploymentPackageId', response.id);
+    core.summary
+      .addHeading("Package Summary")
+      .addRaw(`Package ${packageName} published successfully!<br/>`)
+      .addRaw(`Package ID: ${response.id}<br/>`)
+      .write();
     return response.id;
   }
 
@@ -64987,17 +64997,17 @@ class DeployManager {
 
     console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
-    const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
+    const deploymentTaskId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
     console.log(`New deployment task has been successfully created with id ${deploymentId}`);
 
-    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentId}`;
+    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
 
-      core.summary
-        .addRaw(
-          `<a href="${deploymentUrl}" target="_blank" rel="noopener noreferrer">
-           View deployment details in Digital.ai Deploy UI
-           </a><br/>`
-        )
+    core.setOutput('deploymentTaskId', deploymentTaskId);
+    core.summary
+      .addHeading(`Deployment Summary`)
+      .addRaw(`View deployment details in Digital.ai Deploy UI: ${deploymentUrl}<br/>`)
+      .addRaw(`Deployment task Id: ${deploymentTaskId}<br/>`)
+      .write();
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -65017,15 +65027,15 @@ class DeployManager {
       console.log("Starting rollback process...");
       const rollbackTaskId = await this.createRollbackTask(deploymentId);
       console.log(`Rollback task created with id ${rollbackTaskId}`);
-      
-      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
 
+      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
+      core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
-        .addRaw(
-          `<a href="${rollbackUrl}" target="_blank" rel="noopener noreferrer">
-           View rollback details in Digital.ai Deploy UI
-           </a><br/>`
-        )
+        .addHeading(`Rollback Summary`)
+        .addRaw(`View rollback details in Digital.ai Deploy UI: ${rollbackUrl}<br/>`)
+        .addRaw(`Rollback task Id : ${rollbackTaskId} <br/>`)
+        .write();
+
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
@@ -65321,14 +65331,12 @@ async function run() {
       case ACTIONS.CREATE:
         validateInputs(['manifestPath', 'outputPath']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         break;
 
       case ACTIONS.PUBLISH:
         validateInputs(['darPackagePath']);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         break
 
       case ACTIONS.DEPLOY:
@@ -65339,27 +65347,22 @@ async function run() {
       case ACTIONS.CREATE_PUBLISH:
         validateInputs(['manifestPath', 'outputPath']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         break;
 
       case ACTIONS.PUBLISH_DEPLOY:
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
@@ -65371,12 +65374,10 @@ async function run() {
     core.error(error.stack);
     core.setFailed(error.message);
     core.summary
-      .addHeading('Action Information')
+      .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-  }
-  finally {
-    await core.summary.write();
+      .write(); 
   }
 }
 

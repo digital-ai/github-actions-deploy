@@ -97,7 +97,11 @@ class Archive {
             const relativePath = path.relative(process.cwd(), packageFullPath);
             const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
 
-            //core.info(`Package relative path: ${packageRelativePath}`);
+            core.setOutput('darPackagePath', packageRelativePath);
+            core.summary
+                .addHeading("DAR Package Created")
+                .addRaw(`Package created successfully at ${packageRelativePath} <br/>`)
+                .write();
 
             return packageRelativePath;
         } catch (error) {

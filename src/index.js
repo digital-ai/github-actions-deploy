@@ -119,14 +119,12 @@ async function run() {
       case ACTIONS.CREATE:
         validateInputs(['manifestPath', 'outputPath']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         break;
 
       case ACTIONS.PUBLISH:
         validateInputs(['darPackagePath']);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         break
 
       case ACTIONS.DEPLOY:
@@ -137,27 +135,22 @@ async function run() {
       case ACTIONS.CREATE_PUBLISH:
         validateInputs(['manifestPath', 'outputPath']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         break;
 
       case ACTIONS.PUBLISH_DEPLOY:
         validateInputs(['darPackagePath', 'environmentId']);
         packageFullPath = path.join(process.cwd(), darPackagePathInput);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
       case ACTIONS.CREATE_PUBLISH_DEPLOY:
         validateInputs(['manifestPath', 'outputPath', 'environmentId']);
         packageRelativePath = await createNewPackage(manifestPath, outputPath, packageName, versionNumber);
-        core.setOutput('darPackagePath', packageRelativePath);
         packageFullPath = path.join(process.cwd(), packageRelativePath);
         deploymentPackageId = await publishPackage(packageFullPath);
-        core.setOutput('deploymentPackageId', deploymentPackageId);
         await deployPackage(deploymentPackageId, environmentId, rollback, serverUrl);
         break;
 
@@ -169,12 +162,10 @@ async function run() {
     core.error(error.stack);
     core.setFailed(error.message);
     core.summary
-      .addHeading('Action Information')
+      .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-  }
-  finally {
-    await core.summary.write();
+      .write(); 
   }
 }
 

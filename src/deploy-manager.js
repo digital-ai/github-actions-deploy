@@ -42,6 +42,12 @@ class DeployManager {
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
     console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
+    core.setOutput('deploymentPackageId', response.id);
+    core.summary
+      .addHeading("Package Summary")
+      .addRaw(`Package ${packageName} published successfully!<br/>`)
+      .addRaw(`Package ID: ${response.id}<br/>`)
+      .write();
     return response.id;
   }
 
@@ -71,17 +77,17 @@ class DeployManager {
 
     console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
-    const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
+    const deploymentTaskId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
     console.log(`New deployment task has been successfully created with id ${deploymentId}`);
 
-    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentId}`;
+    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
 
-      core.summary
-        .addRaw(
-          `<a href="${deploymentUrl}" target="_blank" rel="noopener noreferrer">
-           View deployment details in Digital.ai Deploy UI
-           </a><br/>`
-        )
+    core.setOutput('deploymentTaskId', deploymentTaskId);
+    core.summary
+      .addHeading(`Deployment Summary`)
+      .addRaw(`View deployment details in Digital.ai Deploy UI: ${deploymentUrl}<br/>`)
+      .addRaw(`Deployment task Id: ${deploymentTaskId}<br/>`)
+      .write();
 
     await this.startDeploymentTask(deploymentId);
     const taskOutcome = await this.waitForTask(deploymentId);
@@ -101,15 +107,15 @@ class DeployManager {
       console.log("Starting rollback process...");
       const rollbackTaskId = await this.createRollbackTask(deploymentId);
       console.log(`Rollback task created with id ${rollbackTaskId}`);
-      
-      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
 
+      const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
+      core.setOutput('rollbackTaskId', rollbackTaskId);
       core.summary
-        .addRaw(
-          `<a href="${rollbackUrl}" target="_blank" rel="noopener noreferrer">
-           View rollback details in Digital.ai Deploy UI
-           </a><br/>`
-        )
+        .addHeading(`Rollback Summary`)
+        .addRaw(`View rollback details in Digital.ai Deploy UI: ${rollbackUrl}<br/>`)
+        .addRaw(`Rollback task Id : ${rollbackTaskId} <br/>`)
+        .write();
+
       await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
