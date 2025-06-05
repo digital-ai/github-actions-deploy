@@ -178,5 +178,18 @@ Runs **create → publish → deploy** in one continuous flow.
 
 ---
 
+## Summary of All Inputs & Outputs
+
+| **Action Mode**           | **Required Inputs**                                                                                                                                                                    | **Optional Inputs**                    | **Outputs**                                                                                                          |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| **create**                | `serverUrl`, `username`, `password`, `action=create`, `manifestPath`, `outputPath`                                                                                                      | `versionNumber`, `packageName`         | `darPackagePath`                                                                                                     |
+| **publish**               | `serverUrl`, `username`, `password`, `action=publish`, `darPackagePath`                                                                                                                  | —                                      | `deploymentPackageId`                                                                                                |
+| **deploy**                | `serverUrl`, `username`, `password`, `action=deploy`, `deploymentPackageId`, `environmentId`                                                                                              | `rollback`                             | `deploymentTaskId`, `rollbackTaskId`                                                                                  |
+| **create_publish**        | `serverUrl`, `username`, `password`, `action=create_publish`, `manifestPath`, `outputPath`                                                                                                | `versionNumber`, `packageName`         | `darPackagePath`, `deploymentPackageId`                                                                               |
+| **publish_deploy**        | `serverUrl`, `username`, `password`, `action=publish_deploy`, `darPackagePath`, `environmentId`                                                                                            | `rollback`                             | `deploymentPackageId`, `deploymentTaskId`, `rollbackTaskId`                                                            |
+| **create_publish_deploy** | `serverUrl`, `username`, `password`, `action=create_publish_deploy`, `manifestPath`, `outputPath`, `environmentId`                                                                       | `versionNumber`, `packageName`, `rollback` | `darPackagePath`, `deploymentPackageId`, `deploymentTaskId`, `rollbackTaskId`                                        |
+
+---
+
 
 
