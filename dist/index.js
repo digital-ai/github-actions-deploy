@@ -64864,7 +64864,9 @@ class Archive {
 
             core.setOutput('darPackagePath', packageRelativePath);
             core.summary
-                .addHeading("DAR Package Created")
+                .addHeading("Package Creation Summary")
+                .addRaw(`Package name: ${packageName} <br/>`)
+                .addRaw(`Package version: ${versionNumber || 'taken from input manifest file'} <br/>`)
                 .addRaw(`Package created successfully at ${packageRelativePath} <br/>`)
                 .write();
 
@@ -64964,7 +64966,8 @@ class DeployManager {
     console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
     core.setOutput('deploymentPackageId', response.id);
     core.summary
-      .addHeading("Package Summary")
+      .addHeading("Package Publish Summary")
+      .addRaw('Package Full Path: ' + packageFullPath + '<br/>')
       .addRaw(`Package ${packageName} published successfully!<br/>`)
       .addRaw(`Package ID: ${response.id}<br/>`)
       .write();

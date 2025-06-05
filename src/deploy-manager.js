@@ -44,7 +44,8 @@ class DeployManager {
     console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
     core.setOutput('deploymentPackageId', response.id);
     core.summary
-      .addHeading("Package Summary")
+      .addHeading("Package Publish Summary")
+      .addRaw('Package Full Path: ' + packageFullPath + '<br/>')
       .addRaw(`Package ${packageName} published successfully!<br/>`)
       .addRaw(`Package ID: ${response.id}<br/>`)
       .write();
