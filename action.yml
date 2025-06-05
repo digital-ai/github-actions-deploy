@@ -52,7 +52,7 @@ outputs:
   deploymentTaskId:
     description: 'The ID of the deployment task created by the action'
   rollbackTaskId:
-    description: 'The ID of the rollback task created by the action
+    description: 'The ID of the rollback task created by the action'
 
 runs:
   using: 'node20'
