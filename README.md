@@ -39,7 +39,8 @@ jobs:
 
 An example repository using this action : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
 
-**Supported actions**:
+## Supported actions
+
 1. **create**  
 2. **publish**  
 3. **deploy**  
@@ -55,7 +56,7 @@ All modes require the following three fields:
 |-------------|-------------------------------------------------------------|----------|---------|
 | `serverUrl` | URL of your Digital.ai Deploy server (e.g., `https://deploy.example.com`). | Yes      | N/A     |
 | `username`  | Username for Digital.ai Deploy authentication.              | Yes      | N/A     |
-| `password`  | Password (or API token) for Digital.ai Deploy authentication. | Yes      | N/A     |
+| `password`  | Password for Digital.ai Deploy authentication. | Yes      | N/A     |
 
 Below is a comprehensive list of *mode-specific* inputs. Note that some inputs are required only for certain action values.
 
@@ -73,9 +74,9 @@ Generates a new DAR package from a manifest file.
 
 | Name           | Description                                                                                                                                                                       | Required | Default            |
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------------|
-| `manifestPath` | Path to the `deployit-manifest.xml` file (relative to the repository root). <br/>Example: `'deployit-manifest.xml'`.                                                               | Yes      | (none)             |
-| `outputPath`   | Directory where the generated DAR will be stored (relative to the workspace). <br/>Example: `'output/'`.                                                                          | Yes      | (none)             |
-| `versionNumber`| (Optional) Version string to inject into the manifest before packaging. <br/>Example: `'2.0.0'`.                                                                                  | No       | (leave manifest as is) |
+| `manifestPath` | Path to the `deployit-manifest.xml` file (relative to the repository root). <br/>Example: `'deployit-manifest.xml'`.                                                               | Yes      | N/A             |
+| `outputPath`   | Directory where the generated DAR will be stored (relative to the workspace). <br/>Example: `'/output'`.                                                                          | Yes      | N/A             |
+| `versionNumber`| (Optional) Version string to inject into the manifest before packaging. <br/>Example: `'2.0.0'`.                                                                                  | No       | N/A |
 | `packageName`  | (Optional) Name of the DAR package to create (must end with `.dar`). <br/>Example: `'myapp-2.0.0.dar'`. <br/>Default is `package.dar`.                                           | No       | `package.dar`      |
 
 **Outputs** (available after step completes):
@@ -89,7 +90,7 @@ Uploads a pre-existing DAR package to Digital.ai Deploy.
 
 | Name             | Description                                                                                                 | Required | Default |
 |------------------|-------------------------------------------------------------------------------------------------------------|----------|---------|
-| `darPackagePath` | Relative path to the DAR package that will be published. <br/>Example: `'output/myapp-2.0.0.dar'`.           | Yes      | (none)  |
+| `darPackagePath` | Relative path to the DAR package that will be published. <br/>Example: `'output/myapp-2.0.0.dar'`.           | Yes      | N/A  |
 
 **Outputs**:
 - `deploymentPackageId` (string): The unique ID assigned by Digital.ai Deploy to the published package.
@@ -102,8 +103,8 @@ Deploys a previously published package into a specified environment.
 
 | Name                 | Description                                                                                                     | Required | Default |
 |----------------------|-----------------------------------------------------------------------------------------------------------------|----------|---------|
-| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). | Yes      | (none)  |
-| `environmentId`      | The target environment in which to deploy. <br/>Example: `'Environments/Production'`.                           | Yes      | (none)  |
+| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). | Yes      | N/A  |
+| `environmentId`      | The target environment in which to deploy. <br/>Example: `'Environments/Production'`.                           | Yes      | N/A  |
 | `rollback`           | (Optional) Whether to automatically trigger a rollback if the deployment fails. <br/>Choose `'true'` or `'false'`. | No       | `false` |
 
 **Outputs**:
@@ -120,11 +121,10 @@ Equivalent to running `create` and then `publish` in sequence.
 
 | Name           | Description                                                                                       | Required | Default        |
 |----------------|---------------------------------------------------------------------------------------------------|----------|----------------|
-| `manifestPath` | Path to `deployit-manifest.xml`.                                                                  | Yes      | (none)         |
-| `outputPath`   | Directory for storing the generated DAR.                                                          | Yes      | (none)         |
-| `versionNumber`| (Optional) Version string to set in the manifest.                                                 | No       | (none)         |
+| `manifestPath` | Path to `deployit-manifest.xml`.                                                                  | Yes      | N/A         |
+| `outputPath`   | Directory for storing the generated DAR.                                                          | Yes      | N/A         |
+| `versionNumber`| (Optional) Version string to set in the manifest.                                                 | No       | N/A         |
 | `packageName`  | (Optional) DAR filename (must end with `.dar`).                                                   | No       | `package.dar`  |
-| `darPackagePath`| **Not used** here—this is created in the `create` step.                                            | –        | –              |
 
 (The Action itself takes care of passing the generated DAR into the publish operation.)
 
@@ -142,8 +142,8 @@ Equivalent to running `publish` and then `deploy` in sequence.
 
 | Name                 | Description                                                                                                 | Required | Default |
 |----------------------|-------------------------------------------------------------------------------------------------------------|----------|---------|
-| `darPackagePath`     | Relative path to the existing DAR to publish (e.g., `output/service-3.2.1.dar`).                              | Yes      | (none)  |
-| `environmentId`      | Target environment for deployment.                                                                            | Yes      | (none)  |
+| `darPackagePath`     | Relative path to the existing DAR to publish (e.g., `output/service-3.2.1.dar`).                              | Yes      | N/A  |
+| `environmentId`      | Target environment for deployment.                                                                            | Yes      | N/A  |
 | `rollback`           | (Optional) `'true'` to trigger rollback on failure, `'false'` otherwise.                                     | No       | `false` |
 
 (The published package ID is automatically passed into the `deploy` phase.)
@@ -163,11 +163,11 @@ Runs **create → publish → deploy** in one continuous flow.
 
 | Name              | Description                                                                                                      | Required | Default        |
 |-------------------|------------------------------------------------------------------------------------------------------------------|----------|----------------|
-| `manifestPath`    | Path to `deployit-manifest.xml`.                                                                                 | Yes      | (none)         |
-| `outputPath`      | Directory where the DAR will be generated.                                                                       | Yes      | (none)         |
-| `versionNumber`   | (Optional) Version string to set in the manifest.                                                                | No       | (none)         |
+| `manifestPath`    | Path to `deployit-manifest.xml`.                                                                                 | Yes      | N/A         |
+| `outputPath`      | Directory where the DAR will be generated.                                                                       | Yes      | N/A         |
+| `versionNumber`   | (Optional) Version string to set in the manifest.                                                                | No       | N/A         |
 | `packageName`     | (Optional) Desired DAR filename (must end in `.dar`).                                                            | No       | `package.dar`  |
-| `environmentId`   | Target environment ID (e.g., `Environments/Staging`).                                                            | Yes      | (none)         |
+| `environmentId`   | Target environment ID (e.g., `Environments/Staging`).                                                            | Yes      | N/A         |
 | `rollback`        | (Optional) Set to `'true'` to automatically roll back on failure.                                                | No       | `false`        |
 
 **Outputs**:
