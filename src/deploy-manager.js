@@ -147,6 +147,7 @@ class DeployManager {
         await this.archiveDeploymentTask(rollbackTaskId);
         const rollbackUrl = `${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`;
         core.summary
+          .clear()
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
@@ -160,6 +161,7 @@ class DeployManager {
       } else {
         const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
         core.summary
+          .clear()
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
