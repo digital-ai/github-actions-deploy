@@ -33,7 +33,7 @@ jobs:
           versionNumber: '1.0'
           packageName: 'appForAction-1.0.dar'
           environmentId: 'Environments/envForAction'
-          rollback: 'yes'
+          rollback: 'true'
  ```
 ## Example project 
 
