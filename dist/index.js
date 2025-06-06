@@ -65042,8 +65042,7 @@ class DeployManager {
             `Target environment: <i>${targetEnvironment}</i>`,
             `Deployment task Id: <i>${deploymentTaskId}</i>`,
             `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
-          ], false)
-          .write();
+          ], false);
         throw new Error("Deployment failed");
       }
 
