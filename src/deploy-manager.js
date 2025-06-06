@@ -122,6 +122,12 @@ class DeployManager {
         throw new Error("Deployment failed");
       }
 
+      console.log("Starting rollback process...");
+      const rollbackTaskId = await this.createRollbackTask(deploymentTaskId);
+      console.log(`Rollback task created with id ${rollbackTaskId}`);
+      core.setOutput('rollbackTaskId', rollbackTaskId);
+      await this.startDeploymentTask(rollbackTaskId);
+
       const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
       core.summary
         .addHeading('Deployment Summary')
@@ -133,21 +139,14 @@ class DeployManager {
         ], false)
         .write();
 
-      console.log("Starting rollback process...");
-      const rollbackTaskId = await this.createRollbackTask(deploymentTaskId);
-      console.log(`Rollback task created with id ${rollbackTaskId}`);
-      core.setOutput('rollbackTaskId', rollbackTaskId);
-
-
-      await this.startDeploymentTask(rollbackTaskId);
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
         const rollbackUrl = `${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`;
-        core.summary
-          .clear()
+        await core.summary.clear();
+        await core.summary
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
@@ -160,8 +159,8 @@ class DeployManager {
         throw new Error("Deployment failed - Rollback executed successfully");
       } else {
         const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
-        core.summary
-          .clear()
+        await core.summary.clear();
+        await core.summary
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
