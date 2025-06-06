@@ -155,7 +155,7 @@ class DeployManager {
             `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
           ], false)
           .write();
-        console.log("Deployment failed - Rollback executed successfully");
+        console.log("Rollback executed successfully");
         throw new Error("Deployment failed - Rollback executed successfully");
       } else {
         const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
@@ -168,6 +168,7 @@ class DeployManager {
             `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
           ], false)
           .write();
+        console.log("Rollback failed");
         throw new Error("Rollback failed");
       }
     }
