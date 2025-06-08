@@ -1,14 +1,14 @@
-# Digital.ai Deploy GitHub Actions
+# 🚀 Digital.ai Deploy GitHub Actions
 
 This GitHub Action automates the creation, publishing, and deployment of packages on Digital.ai Deploy. It facilitates seamless integration between your GitHub repository and Digital.ai Deploy, streamlining your deployment management processes.
 
-## Features
+## ✨ Features
 
 - **Create**: Generate a new DAR package from a specified manifest file.
 - **Publish**: Upload a DAR package to Digital.ai Deploy.
 - **Deploy**: Deploy the package to a specified environment.
 
-## Example Usage
+## 📦 Example Usage
 
 ```yaml
 name: Create Publish and Deploy Package
@@ -35,11 +35,11 @@ jobs:
           environmentId: 'Environments/envForAction'
           rollback: 'true'
  ```
-## Example project 
+## ⚠️ Important Note
 
-An example repository using this action : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
+During execution, this action creates a temporary directory named **`tmp-dai`** in the working directory. This folder is used internally for processing the `deployit-manifest.xml` file. If the action is used in multiple steps within the **same job**, the `tmp-dai` folder **will be** deleted and recreated in each step. This ensures clean isolation and avoids conflicts between steps.
 
-## Supported actions
+## 🛠️ Supported actions
 
 1. **create**  
 2. **publish**  
@@ -48,27 +48,20 @@ An example repository using this action : <a href="https://github.com/digital-ai
 5. **publish_deploy**  
 6. **create_publish_deploy** 
 
-## Inputs
+## 🔧 Inputs
 
-All modes require the following three fields:
+### 🔁 Common
 
 | Name        | Description                                                 | Required | Default |
 |-------------|-------------------------------------------------------------|----------|---------|
 | `serverUrl` | URL of your Digital.ai Deploy server (e.g., `https://deploy.example.com`). | Yes      | N/A     |
 | `username`  | Username for Digital.ai Deploy authentication.              | Yes      | N/A     |
 | `password`  | Password for Digital.ai Deploy authentication. | Yes      | N/A     |
-
-Below is a comprehensive list of *mode-specific* inputs. Note that some inputs are required only for certain action values.
-
-### `action` (common)
-
-| Name     | Description                                                                                                                                                      | Required | Default                     |
-|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|-----------------------------|
-| `action` | Specifies which operation(s) to perform. Choose one of: <br/>• `create` <br/>• `publish` <br/>• `deploy` <br/>• `create_publish` <br/>• `publish_deploy` <br/>• `create_publish_deploy` | No      | `create_publish_deploy`     |
+| `action`    | Specifies the operation(s). One of: `create`, `publish`, `deploy`, `create_publish`, `publish_deploy`, `create_publish_deploy` | No | `create_publish_deploy` |
 
 ---
 
-### 1. Action = `create`
+### 🧱 1. Action = `create`
 
 Generates a new DAR package from a manifest file.
 
@@ -84,7 +77,7 @@ Generates a new DAR package from a manifest file.
 
 ---
 
-### 2. Action = `publish`
+### 📤 2. Action = `publish`
 
 Uploads a pre-existing DAR package to Digital.ai Deploy.
 
@@ -97,7 +90,7 @@ Uploads a pre-existing DAR package to Digital.ai Deploy.
 
 ---
 
-### 3. Action = `deploy`
+### 🚀 3. Action = `deploy`
 
 Deploys a previously published package into a specified environment.
 
@@ -105,7 +98,7 @@ Deploys a previously published package into a specified environment.
 |----------------------|-----------------------------------------------------------------------------------------------------------------|----------|---------|
 | `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). | Yes      | N/A  |
 | `environmentId`      | The target environment in which to deploy. <br/>Example: `'Environments/Production'`.                           | Yes      | N/A  |
-| `rollback`           | (Optional) Whether to automatically trigger a rollback if the deployment fails. <br/>Choose `'true'` or `'false'`. | No       | `false` |
+| `rollback`           | (Optional) Whether to automatically trigger a rollback if the deployment fails. <br/>Accepts string values: `'true'` or `'false'`. | No       | `false` |
 
 **Outputs**:
 - `deploymentTaskId` (string): ID of the deployment task created by Digital.ai Deploy.  
@@ -113,7 +106,7 @@ Deploys a previously published package into a specified environment.
 
 ---
 
-### 4. Action = `create_publish`
+### 🧰 4. Action = `create_publish`
 
 Equivalent to running `create` and then `publish` in sequence.  
 
@@ -134,7 +127,7 @@ Equivalent to running `create` and then `publish` in sequence.
 
 ---
 
-### 5. Action = `publish_deploy`
+### 🔗 5. Action = `publish_deploy`
 
 Equivalent to running `publish` and then `deploy` in sequence.  
 
@@ -155,7 +148,7 @@ Equivalent to running `publish` and then `deploy` in sequence.
 
 ---
 
-### 6. Action = `create_publish_deploy`
+### 🛠️ 6. Action = `create_publish_deploy`
 
 Runs **create → publish → deploy** in one continuous flow.  
 
@@ -178,7 +171,7 @@ Runs **create → publish → deploy** in one continuous flow.
 
 ---
 
-## Summary of All Inputs & Outputs
+## 🗂️ Summary of Inputs & Outputs
 
 | **Action Mode**           | **Required Inputs**                                                                                                                                                                    | **Optional Inputs**                    | **Outputs**                                                                                                          |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
@@ -190,6 +183,10 @@ Runs **create → publish → deploy** in one continuous flow.
 | **create_publish_deploy** | `serverUrl`, `username`, `password`, `action=create_publish_deploy`, `manifestPath`, `outputPath`, `environmentId`                                                                       | `versionNumber`, `packageName`, `rollback` | `darPackagePath`, `deploymentPackageId`, `deploymentTaskId`, `rollbackTaskId`                                        |
 
 ---
+
+## Example project 
+
+An example repository using this action : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
 
 
 
