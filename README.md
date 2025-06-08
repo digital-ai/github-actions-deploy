@@ -114,7 +114,7 @@ Equivalent to running `create` and then `publish` in sequence.
 
 | Name           | Description                                                                                       | Required | Default        |
 |----------------|---------------------------------------------------------------------------------------------------|----------|----------------|
-| `manifestPath` | Path to `deployit-manifest.xml`.                                                                  | Yes      | N/A         |
+| `manifestPath` | Path to manifest file.                                                                  | Yes      | N/A         |
 | `outputPath`   | Directory for storing the generated DAR.                                                          | Yes      | N/A         |
 | `versionNumber`| (Optional) Version string to set in the manifest.                                                 | No       | N/A         |
 | `packageName`  | (Optional) DAR filename (must end with `.dar`).                                                   | No       | `package.dar`  |
@@ -135,7 +135,7 @@ Equivalent to running `publish` and then `deploy` in sequence.
 
 | Name                 | Description                                                                                                 | Required | Default |
 |----------------------|-------------------------------------------------------------------------------------------------------------|----------|---------|
-| `darPackagePath`     | Relative path to the existing DAR to publish (e.g., `output/service-3.2.1.dar`).                              | Yes      | N/A  |
+| `darPackagePath`     | Relative path to the existing DAR to publish.                              | Yes      | N/A  |
 | `environmentId`      | Target environment for deployment.                                                                            | Yes      | N/A  |
 | `rollback`           | (Optional) `'true'` to trigger rollback on failure, `'false'` otherwise.                                     | No       | `false` |
 
@@ -156,11 +156,11 @@ Runs **create → publish → deploy** in one continuous flow.
 
 | Name              | Description                                                                                                      | Required | Default        |
 |-------------------|------------------------------------------------------------------------------------------------------------------|----------|----------------|
-| `manifestPath`    | Path to `deployit-manifest.xml`.                                                                                 | Yes      | N/A         |
+| `manifestPath`    | Path to manifest file.xml`.                                                                                 | Yes      | N/A         |
 | `outputPath`      | Directory where the DAR will be generated.                                                                       | Yes      | N/A         |
 | `versionNumber`   | (Optional) Version string to set in the manifest.                                                                | No       | N/A         |
 | `packageName`     | (Optional) Desired DAR filename (must end in `.dar`).                                                            | No       | `package.dar`  |
-| `environmentId`   | Target environment ID (e.g., `Environments/Staging`).                                                            | Yes      | N/A         |
+| `environmentId`   | Target environment ID.                                                            | Yes      | N/A         |
 | `rollback`        | (Optional) Set to `'true'` to automatically roll back on failure.                                                | No       | `false`        |
 
 **Outputs**:
