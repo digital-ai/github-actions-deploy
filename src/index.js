@@ -167,7 +167,7 @@ async function run() {
 
     core.error(error.stack);
     core.setFailed(error.message);
-    core.summary
+    await core.summary
       .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)

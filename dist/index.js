@@ -64870,7 +64870,7 @@ class Archive {
             const packageRelativePath = path.relative(process.cwd(), packageFullPath);
 
             core.setOutput('darPackagePath', packageRelativePath);
-            core.summary
+            await core.summary
                 .addHeading("Package Creation Summary")
                 .addList([
                     `Input manifest full path: <i>${manifestPath}</i>`,
@@ -64999,7 +64999,7 @@ class DeployManager {
     const response = await this.apiRequest(endpoint, method, formData, headers);
     console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
     core.setOutput('deploymentPackageId', response.id);
-    core.summary
+    await core.summary
       .addHeading("Package Publish Summary")
       .addList([
         `Package full path: <i>${packageFullPath}</i>`,
@@ -65050,7 +65050,7 @@ class DeployManager {
       // Archive the deployment task
       await this.archiveDeploymentTask(deploymentTaskId);
       const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
-      core.summary
+      await core.summary
         .addHeading('Deployment Summary')
         .addList([
           `Deployment package Id: <i>${deploymentPackageId}</i>`,
@@ -65066,14 +65066,15 @@ class DeployManager {
       }
       if (rollback === 'false') {
         const deploymentUrl = `${serverUrl}/#/explorer?taskId=${deploymentTaskId}`;
-        core.summary
+        await core.summary
           .addHeading('Deployment Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
             `Target environment: <i>${targetEnvironment}</i>`,
             `Deployment task Id: <i>${deploymentTaskId}</i>`,
             `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
-          ], false);
+          ], false)
+          .write();
         throw new Error("Deployment failed");
       }
 
@@ -65084,7 +65085,7 @@ class DeployManager {
       await this.startDeploymentTask(rollbackTaskId);
 
       const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
-      core.summary
+      await core.summary
         .addHeading('Deployment Summary')
         .addList([
           `Deployment package Id: <i>${deploymentPackageId}</i>`,
@@ -65100,7 +65101,7 @@ class DeployManager {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
         const rollbackUrl = `${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`;
-        core.summary
+        await core.summary
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
@@ -65108,18 +65109,20 @@ class DeployManager {
             `Rollback task Id: <i>${rollbackTaskId}</i>`,
             `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
           ], false)
+          .write();
         console.log("Rollback executed successfully");
         throw new Error("Deployment failed - Rollback executed successfully");
       } else {
         const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
-        core.summary
+        await core.summary
           .addHeading('Rollback Summary')
           .addList([
             `Deployment package Id: <i>${deploymentPackageId}</i>`,
             `Target environment: <i>${targetEnvironment}</i>`,
             `Rollback task Id: <i>${rollbackTaskId}</i>`,
             `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
-          ], false);
+          ], false)
+          .write();
         console.log("Rollback failed");
         throw new Error("Rollback failed");
       }
@@ -65455,7 +65458,7 @@ async function run() {
 
     core.error(error.stack);
     core.setFailed(error.message);
-    core.summary
+    await core.summary
       .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
@@ -65517,6 +65520,16 @@ class Util {
 
         const newXml = Util.buildXml(xmlObj);
         await fs.promises.writeFile(manifestPath, newXml, "utf8");
+    }
+
+    static startsWith(inputString, value, ignoreCase) {
+        
+        const subString = inputString.substring(0, value.length);
+        if (ignoreCase) {
+            return subString.toLowerCase() === value.toLowerCase();
+        } else {
+            return subString === value;
+        }
     }
 }
 

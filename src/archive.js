@@ -105,7 +105,7 @@ class Archive {
             const packageRelativePath = path.relative(process.cwd(), packageFullPath);
 
             core.setOutput('darPackagePath', packageRelativePath);
-            core.summary
+            await core.summary
                 .addHeading("Package Creation Summary")
                 .addList([
                     `Input manifest full path: <i>${manifestPath}</i>`,

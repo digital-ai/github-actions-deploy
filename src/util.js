@@ -38,6 +38,16 @@ class Util {
         const newXml = Util.buildXml(xmlObj);
         await fs.promises.writeFile(manifestPath, newXml, "utf8");
     }
+
+    static startsWith(inputString, value, ignoreCase) {
+        
+        const subString = inputString.substring(0, value.length);
+        if (ignoreCase) {
+            return subString.toLowerCase() === value.toLowerCase();
+        } else {
+            return subString === value;
+        }
+    }
 }
 
 module.exports = Util;
