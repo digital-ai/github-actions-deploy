@@ -30,8 +30,8 @@ jobs:
           manifestPath: '/your-manifest.xml'
           action: 'create_publish_deploy'
           outputPath: '/outputdar'
-          versionNumber: '1.0'
-          packageName: 'appForAction-1.0.dar'
+          versionNumber: '1.0.0'
+          packageName: 'appForAction-1.0.0.dar'
           environmentId: 'Environments/envForAction'
           rollback: 'true'
  ```
@@ -67,13 +67,13 @@ Generates a new DAR package from a manifest file.
 
 | Name           | Description                                                                                                                                                                       | Required | Default            |
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------------|
-| `manifestPath` | Path to the `deployit-manifest.xml` file (relative to the repository root). <br/>Example: `'deployit-manifest.xml'`.                                                               | Yes      | N/A             |
-| `outputPath`   | Directory where the generated DAR will be stored (relative to the workspace). <br/>Example: `'/output'`.                                                                          | Yes      | N/A             |
-| `versionNumber`| (Optional) Version string to inject into the manifest before packaging. <br/>Example: `'2.0.0'`.                                                                                  | No       | N/A |
-| `packageName`  | (Optional) Name of the DAR package to create (must end with `.dar`). <br/>Example: `'myapp-2.0.0.dar'`. <br/>Default is `package.dar`.                                           | No       | `package.dar`      |
+| `manifestPath` | Path to the manifest file (relative to the repository root). <br/>Example: `'/deployit-manifest.xml'`or `'/manifests/my-service.xml'`.                                                               | Yes      | N/A             |
+| `outputPath`   | Directory where the generated DAR will be stored (relative to the workspace). <br/>Example: `'/outputdar'`.                                                                          | Yes      | N/A             |
+| `versionNumber`| (Optional) Version string to inject into the manifest before packaging. <br/>Example: `'1.0.0'`.                                                                                  | No       | N/A |
+| `packageName`  | (Optional) Name of the DAR package to create (must end with `.dar`). <br/>Example: `'myapp-1.0.0.dar'`. <br/>Default is `package.dar`.                                           | No       | `package.dar`      |
 
-**Outputs** (available after step completes):
-- `darPackagePath` (string): Relative path to the generated DAR file, e.g., `output/myapp-2.0.0.dar`.
+**Outputs** :
+- `darPackagePath` (string): Relative path to the generated DAR file, e.g., `outputdar/myapp-1.0.0.dar`.
 
 ---
 
@@ -83,10 +83,10 @@ Uploads a pre-existing DAR package to Digital.ai Deploy.
 
 | Name             | Description                                                                                                 | Required | Default |
 |------------------|-------------------------------------------------------------------------------------------------------------|----------|---------|
-| `darPackagePath` | Relative path to the DAR package that will be published. <br/>Example: `'output/myapp-2.0.0.dar'`.           | Yes      | N/A  |
+| `darPackagePath` | Relative path to the DAR package that will be published. <br/>Example: `'outputdar/myapp-1.0.0.dar'`.           | Yes      | N/A  |
 
 **Outputs**:
-- `deploymentPackageId` (string): The unique ID assigned by Digital.ai Deploy to the published package.
+- `deploymentPackageId` (string): The unique ID assigned by Digital.ai Deploy to the published package. e.g., `Applications/appForAction/1.0`.
 
 ---
 
@@ -96,13 +96,13 @@ Deploys a previously published package into a specified environment.
 
 | Name                 | Description                                                                                                     | Required | Default |
 |----------------------|-----------------------------------------------------------------------------------------------------------------|----------|---------|
-| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). >Example: `'Applications/appForAction/1.0'`.| Yes      | N/A  |
+| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). Example: `'Applications/appForAction/1.0'`.| Yes      | N/A  |
 | `environmentId`      | The target environment in which to deploy. <br/>Example: `'Environments/Production'`.                           | Yes      | N/A  |
 | `rollback`           | (Optional) Whether to automatically trigger a rollback if the deployment fails. <br/>Accepts string values: `'true'` or `'false'`. | No       | `false` |
 
 **Outputs**:
-- `deploymentTaskId` (string): ID of the deployment task created by Digital.ai Deploy.  
-- `rollbackTaskId` (string): If a rollback is invoked, this will contain the ID of the rollback task; otherwise, this output is empty.
+- `deploymentTaskId` (string): ID of the deployment task created by Digital.ai Deploy.  e.g., `677f5322-31ce-43fe-8758-6730c734ba75`.
+- `rollbackTaskId` (string): If a rollback is invoked, this will contain the ID of the rollback task; otherwise, this output is empty. e.g., `847f5322-31ce-43fe-8758-6730c734ba58`.
 
 ---
 
