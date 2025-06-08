@@ -1,6 +1,6 @@
 {
   "name": "github-actions-deploy",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "The GitHub Actions for Digital.ai Deploy",
   "homepage": "https://github.com/digital-ai/github-actions-deploy#readme",
   "repository": {
