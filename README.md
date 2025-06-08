@@ -184,6 +184,39 @@ Runs **create → publish → deploy** in one continuous flow.
 
 ---
 
+## 📋 Job Summary and Deployment UI Links
+
+As part of the GitHub Actions workflow, this action automatically generates structured summaries in the **GitHub Actions job summary page**. These summaries provide clear visibility into each step performed during the deployment process.
+
+### ✅ Summary Sections
+
+You will find the following labeled sections in the summary:
+
+- **📦 Package Creation Summary**  
+  Displays the input manifest path, package name, version number, and the location where the DAR package was created (`darPackagePath`).
+
+- **📤 Package Publish Summary**  
+  Shows the path of the published DAR and the `deploymentPackageId` assigned by Digital.ai Deploy.
+
+- **🚀 Deployment Summary**  
+  Includes the `deploymentPackageId`, target `environmentId`, `deploymentTaskId`, and `rollbackTaskId` (if rollback was triggered).  
+
+Each summary section helps trace what was executed and what outputs were produced.
+
+### 🔗 Deployment URLs
+
+The **Deployment Summary** section also includes a direct link to the deployment or rollback report in the **Digital.ai Deploy UI**. These links allow you to instantly navigate to:
+
+- ✅ Deployment status and logs  
+- 🔄 Rollback execution history (if applicable)  
+- 🔍 Task explorer views for deeper inspection
+
+> Example:
+> `View deployment details in Digital.ai Deploy UI: https://deploy.example.com/#/reports/deployments?taskId=12345`
+
+These job summaries are especially useful for auditing, debugging, or reviewing automated deployment pipelines in real-time.
+
+
 ## Example project 
 
 An example repository using this action : <a href="https://github.com/digital-ai/github-actions-deploy-demo" target="_blank">github-actions-deploy-demo</a>
