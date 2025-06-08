@@ -96,7 +96,7 @@ Deploys a previously published package into a specified environment.
 
 | Name                 | Description                                                                                                     | Required | Default |
 |----------------------|-----------------------------------------------------------------------------------------------------------------|----------|---------|
-| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). | Yes      | N/A  |
+| `deploymentPackageId`| The ID of the DAR package that was returned by the `publish` action (or manually obtained from Digital.ai Deploy). >Example: `'Applications/appForAction/1.0'`.| Yes      | N/A  |
 | `environmentId`      | The target environment in which to deploy. <br/>Example: `'Environments/Production'`.                           | Yes      | N/A  |
 | `rollback`           | (Optional) Whether to automatically trigger a rollback if the deployment fails. <br/>Accepts string values: `'true'` or `'false'`. | No       | `false` |
 
