@@ -57,7 +57,7 @@ class Archive {
             core.info(`Copied original manifest from '${manifestPath}' to temporary manifest at '${tmpManifestPath}'`);
 
             if (versionNumber) {
-                Util.setVersion(tmpManifestPath, versionNumber);
+                await Util.setVersion(tmpManifestPath, versionNumber);
                 core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
             } else {
                 core.info(`No version number provided, skipping version update in manifest at '${tmpManifestPath}'`);
