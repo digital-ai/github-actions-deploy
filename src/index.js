@@ -1,6 +1,7 @@
 const core = require('@actions/core');
 const path = require("path");
 const fs = require("fs");
+const fsp = fs.promises;
 const Archive = require('./archive');
 const DeployManager = require('./deploy-manager');
 
@@ -11,7 +12,9 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   }
 
   const manifestFullPath = path.join(process.cwd(), manifestPath);
-  if (!fs.existsSync(manifestFullPath)) {
+  try {
+    await fsp.access(manifestFullPath);
+  } catch {
     throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
   core.info(`Manifest full path: ${manifestFullPath}`);
@@ -21,11 +24,14 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 }
 
 async function publishPackage(packageFullPath) {
+  
   if (!packageFullPath.endsWith(".dar")) {
     throw new Error("Invalid package path: the path must have a '.dar' extension.");
   }
 
-  if (!fs.existsSync(packageFullPath)) {
+  try {
+    await fsp.access(packageFullPath);
+  } catch {
     throw new Error(`Package DAR file not found at: ${packageFullPath}`);
   }
 
@@ -49,7 +55,7 @@ async function run() {
     };
 
     // Read all inputs
-    const action = core.getInput('action') || 'create_publish_deploy';
+    const action = core.getInput('action') || ACTIONS.CREATE_PUBLISH_DEPLOY;
     const serverUrl = core.getInput('serverUrl').replace(/\/$/, ''); // Remove trailing '/'
     const username = core.getInput('username');
     const password = core.getInput('password');
@@ -96,7 +102,7 @@ async function run() {
 
     // Verify connection to Digital.ai Deploy server
     core.info('Verifying connection to Digital.ai Deploy server...');
-    
+
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
@@ -165,7 +171,7 @@ async function run() {
       .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-      .write(); 
+      .write();
   }
 }
 
@@ -173,4 +179,7 @@ module.exports = {
   run
 };
 
-run();
+run().catch(err => {
+  core.error(err.stack);
+  core.setFailed(err.message);
+});

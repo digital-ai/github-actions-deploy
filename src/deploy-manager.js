@@ -1,6 +1,7 @@
 const core = require('@actions/core');
 const axios = require('axios');
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const FormData = require('form-data');
 const Util = require('./util');
@@ -10,31 +11,51 @@ class DeployManager {
   static serverConfig;
 
   // General API request method
+  // deploy-manager.js
+
   static async apiRequest(endpoint, method, data, headers) {
     const { url, username, password } = this.serverConfig;
+
+    // build axios config
+    const config = {
+      url: `${url}${endpoint}`,
+      method: method.toUpperCase(),
+      headers,
+      auth: { username, password }
+    };
+
+    // only attach a body when it’s not a GET
+    if (config.method !== 'GET') {
+      config.data = data;
+    }
+
     try {
-      const response = await axios({
-        url: `${url}${endpoint}`,
-        method,
-        headers,
-        auth: { username, password },
-        data
-      });
+      const response = await axios(config);
       return response.data;
     } catch (error) {
       const statusCode = error.response ? error.response.status : 'No response';
       const errorData = error.response ? error.response.data : error.message;
-      console.error(`Error with ${method.toUpperCase()} request to ${endpoint}: Status Code: ${statusCode}, Data:`, errorData);
+      console.error(
+        `Error with ${config.method} request to ${endpoint}: ` +
+        `Status Code: ${statusCode}, Data:`, errorData
+      );
       throw new Error(`Request failed with status ${statusCode}: ${JSON.stringify(errorData)}`);
     }
   }
 
+
   // Publish a package
   static async publishPackage(packageFullPath) {
     const packageName = path.basename(packageFullPath);
-    const fileData = fs.readFileSync(packageFullPath);
+    try {
+      await fsp.access(packageFullPath);
+    } catch {
+      throw new Error(`Package DAR file not found at: ${packageFullPath}`);
+    }
+
+    const fileStream = fs.createReadStream(packageFullPath);
     const formData = new FormData();
-    formData.append('fileData', fileData, packageName);
+    formData.append('fileData', fileStream, packageName);
 
     const headers = formData.getHeaders();
     const endpoint = `/deployit/package/upload/${packageName}`;

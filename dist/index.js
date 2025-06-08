@@ -64766,6 +64766,7 @@ ZipStream.prototype.finalize = function() {
 const core = __nccwpck_require__(7484);
 const archiver = __nccwpck_require__(9392);
 const fs = __nccwpck_require__(9896);
+const fsp = fs.promises;
 const path = __nccwpck_require__(6928);
 const xml2js = __nccwpck_require__(758);
 const Util = __nccwpck_require__(8793);
@@ -64773,7 +64774,7 @@ const Util = __nccwpck_require__(8793);
 class Archive {
     // Parse the manifest XML file and extract paths of files to be included in the package
     static async getPathsFromManifest(manifestPath) {
-        const manifest = fs.readFileSync(manifestPath, "utf8");
+        const manifest = await fsp.readFile(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
             xml2js.parseString(manifest, { explicitArray: false }, (err, json) => {
                 if (err) {
@@ -64810,15 +64811,18 @@ class Archive {
 
             const rootPath = process.cwd();
             const tmpDir = path.join(rootPath, 'tmp-dai');
-            if (fs.existsSync(tmpDir)) {
+            try {
+                await fsp.access(tmpDir);
                 core.info(`Temporary directory already exists: ${tmpDir}. Removing it...`);
-                fs.rmSync(tmpDir, { recursive: true, force: true });
+                await fsp.rm(tmpDir, { recursive: true, force: true });
+            } catch {
+                // not present, no cleanup needed
             }
             core.info(`Creating temporary directory for manifest : ${tmpDir}`);
-            fs.mkdirSync(tmpDir);
+            await fsp.mkdir(tmpDir);
 
             const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
-            fs.copyFileSync(manifestPath, tmpManifestPath);
+            await fsp.copyFile(manifestPath, tmpManifestPath);
             core.info(`Copied original manifest from '${manifestPath}' to temporary manifest at '${tmpManifestPath}'`);
 
             if (versionNumber) {
@@ -64829,11 +64833,12 @@ class Archive {
             }
 
             // Create the output directory if it doesn't exist
-            if (!fs.existsSync(outputPath)) {
-                core.info(`Output path not found, creating folder structure: ${outputPath}`);
-                fs.mkdirSync(outputPath, { recursive: true });
-            } else {
+            try {
+                await fsp.access(outputPath);
                 core.info(`Output path already exists: ${outputPath}`);
+            } catch {
+                core.info(`Output path not found, creating folder structure: ${outputPath}`);
+                await fsp.mkdir(outputPath, { recursive: true });
             }
 
             // Set the package name, ensuring it ends with .dar
@@ -64848,8 +64853,11 @@ class Archive {
             core.info(`Package path set: ${packageFullPath}`);
 
             // Throw an error if a package already exists at the target path
-            if (fs.existsSync(packageFullPath)) {
+            try {
+                await fsp.access(packageFullPath);
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
+            } catch {
+                // file doesn't exist — OK to proceed
             }
 
             const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
@@ -64859,8 +64867,7 @@ class Archive {
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
             core.info(`Package created at: ${packageFullPath}`);
 
-            const relativePath = path.relative(process.cwd(), packageFullPath);
-            const packageRelativePath = relativePath.startsWith(path.sep) ? relativePath : path.sep + relativePath;
+            const packageRelativePath = path.relative(process.cwd(), packageFullPath);
 
             core.setOutput('darPackagePath', packageRelativePath);
             core.summary
@@ -64870,10 +64877,11 @@ class Archive {
                     `Package name: <i>${packageName}</i>`,
                     `Package version: <i>${versionNumber || 'taken from input manifest file'}</i>`,
                     `Package created successfully at <i>${packageRelativePath}</i><br/>`
-                ], false) 
+                ], false)
                 .write();
 
             return packageRelativePath;
+
         } catch (error) {
             core.info("Error in creating the DAR package....");
             throw error;
@@ -64888,8 +64896,8 @@ class Archive {
         archive.pipe(output);
 
         for (const entry of filesToInclude) {
+            
             let fullyEntryPath;
-
             if (entry === "deployit-manifest.xml") {
                 fullyEntryPath = path.join(rootPath, "tmp-dai", entry);
             } else {
@@ -64897,11 +64905,13 @@ class Archive {
             }
             core.info(`Adding entry: ${entry} from path: ${fullyEntryPath}`);
 
-            if (!fs.existsSync(fullyEntryPath)) {
+            try {
+                await fsp.access(fullyEntryPath);
+            } catch {
                 throw new Error(`File not found: ${fullyEntryPath}`);
             }
-
-            if (fs.statSync(fullyEntryPath).isDirectory()) {
+            const stats = await fsp.stat(fullyEntryPath);
+            if (stats.isDirectory()) {
                 archive.directory(fullyEntryPath, entry);
             } else {
                 archive.append(fs.createReadStream(fullyEntryPath), { name: entry });
@@ -64926,6 +64936,7 @@ module.exports = Archive;
 const core = __nccwpck_require__(7484);
 const axios = __nccwpck_require__(7269);
 const fs = __nccwpck_require__(9896);
+const fsp = fs.promises;
 const path = __nccwpck_require__(6928);
 const FormData = __nccwpck_require__(6454);
 const Util = __nccwpck_require__(8793);
@@ -64935,31 +64946,51 @@ class DeployManager {
   static serverConfig;
 
   // General API request method
+  // deploy-manager.js
+
   static async apiRequest(endpoint, method, data, headers) {
     const { url, username, password } = this.serverConfig;
+
+    // build axios config
+    const config = {
+      url: `${url}${endpoint}`,
+      method: method.toUpperCase(),
+      headers,
+      auth: { username, password }
+    };
+
+    // only attach a body when it’s not a GET
+    if (config.method !== 'GET') {
+      config.data = data;
+    }
+
     try {
-      const response = await axios({
-        url: `${url}${endpoint}`,
-        method,
-        headers,
-        auth: { username, password },
-        data
-      });
+      const response = await axios(config);
       return response.data;
     } catch (error) {
       const statusCode = error.response ? error.response.status : 'No response';
       const errorData = error.response ? error.response.data : error.message;
-      console.error(`Error with ${method.toUpperCase()} request to ${endpoint}: Status Code: ${statusCode}, Data:`, errorData);
+      console.error(
+        `Error with ${config.method} request to ${endpoint}: ` +
+        `Status Code: ${statusCode}, Data:`, errorData
+      );
       throw new Error(`Request failed with status ${statusCode}: ${JSON.stringify(errorData)}`);
     }
   }
 
+
   // Publish a package
   static async publishPackage(packageFullPath) {
     const packageName = path.basename(packageFullPath);
-    const fileData = fs.readFileSync(packageFullPath);
+    try {
+      await fsp.access(packageFullPath);
+    } catch {
+      throw new Error(`Package DAR file not found at: ${packageFullPath}`);
+    }
+
+    const fileStream = fs.createReadStream(packageFullPath);
     const formData = new FormData();
-    formData.append('fileData', fileData, packageName);
+    formData.append('fileData', fileStream, packageName);
 
     const headers = formData.getHeaders();
     const endpoint = `/deployit/package/upload/${packageName}`;
@@ -65258,6 +65289,7 @@ module.exports = DeployManager;
 const core = __nccwpck_require__(7484);
 const path = __nccwpck_require__(6928);
 const fs = __nccwpck_require__(9896);
+const fsp = fs.promises;
 const Archive = __nccwpck_require__(79);
 const DeployManager = __nccwpck_require__(680);
 
@@ -65268,7 +65300,9 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
   }
 
   const manifestFullPath = path.join(process.cwd(), manifestPath);
-  if (!fs.existsSync(manifestFullPath)) {
+  try {
+    await fsp.access(manifestFullPath);
+  } catch {
     throw new Error(`Manifest file not found at: ${manifestFullPath}`);
   }
   core.info(`Manifest full path: ${manifestFullPath}`);
@@ -65278,11 +65312,14 @@ async function createNewPackage(manifestPath, outputPath, packageName, versionNu
 }
 
 async function publishPackage(packageFullPath) {
+  
   if (!packageFullPath.endsWith(".dar")) {
     throw new Error("Invalid package path: the path must have a '.dar' extension.");
   }
 
-  if (!fs.existsSync(packageFullPath)) {
+  try {
+    await fsp.access(packageFullPath);
+  } catch {
     throw new Error(`Package DAR file not found at: ${packageFullPath}`);
   }
 
@@ -65306,7 +65343,7 @@ async function run() {
     };
 
     // Read all inputs
-    const action = core.getInput('action') || 'create_publish_deploy';
+    const action = core.getInput('action') || ACTIONS.CREATE_PUBLISH_DEPLOY;
     const serverUrl = core.getInput('serverUrl').replace(/\/$/, ''); // Remove trailing '/'
     const username = core.getInput('username');
     const password = core.getInput('password');
@@ -65353,7 +65390,7 @@ async function run() {
 
     // Verify connection to Digital.ai Deploy server
     core.info('Verifying connection to Digital.ai Deploy server...');
-    
+
     const serverState = await DeployManager.getServerState();
     if (serverState !== "RUNNING") {
       throw new Error("Digital.ai Deploy server not reachable. Address or credentials are invalid or server is not in a running state.");
@@ -65422,7 +65459,7 @@ async function run() {
       .addHeading('Action Failed')
       .addSeparator()
       .addCodeBlock(error.stack || error.message)
-      .write(); 
+      .write();
   }
 }
 
@@ -65430,7 +65467,11 @@ module.exports = {
   run
 };
 
-run();
+run().catch(err => {
+  core.error(err.stack);
+  core.setFailed(err.message);
+});
+
 
 /***/ }),
 
@@ -65442,49 +65483,40 @@ const xml2js = __nccwpck_require__(758);
 
 class Util {
 
-    // Check if input string starts with a specific value
-    static startsWith(inputString, value, ignoreCase) {
-        const subString = inputString.substring(0, value.length);
-
-        if (ignoreCase) {
-            return subString.toLowerCase() === value.toLowerCase();
-        } else {
-            return subString === value;
-        }
-    }
-
-    // Set version in the manifest file
-    static async setVersion(manifestPath, version) {
-        const text = fs.readFileSync(manifestPath, "utf8");
-        const xml = await this.xml2json(text);
-
-        const udmDeploymentPackageElement = xml["udm.DeploymentPackage"];
-        const udmProvisioningPackageElement = xml["udm.ProvisioningPackage"];
-
-        if (udmDeploymentPackageElement) {
-            udmDeploymentPackageElement.$.version = version;
-        } else if (udmProvisioningPackageElement) {
-            udmProvisioningPackageElement.$.version = version;
-        } else {
-            throw new Error(`${manifestPath} is not a valid manifest file.`);
-        }
-
-        const builder = new xml2js.Builder();
-        fs.writeFileSync(manifestPath, builder.buildObject(xml), "utf8");
-        
-    }
-
-    // Convert XML to JSON
-    static async xml2json(xml) {
+    static async parseXml(xml) {
         return new Promise((resolve, reject) => {
             xml2js.parseString(xml, { explicitArray: false }, (err, json) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(json);
-                }
+                if (err) reject(err);
+                else resolve(json);
             });
         });
+    }
+
+    static buildXml(obj) {
+        const builder = new xml2js.Builder();
+        return builder.buildObject(obj);
+    }
+
+    static async setVersion(manifestPath, version) {
+        const text = await fs.promises.readFile(manifestPath, "utf8");
+        const xmlObj = await Util.parseXml(text);
+
+        const udmDeployment = xmlObj["udm.DeploymentPackage"];
+        const udmProvisioning = xmlObj["udm.ProvisioningPackage"];
+
+        if (udmDeployment) {
+            udmDeployment.$.version = version;
+        } else if (udmProvisioning) {
+            udmProvisioning.$.version = version;
+        } else {
+            throw new Error(
+                `${manifestPath} is not a supported manifest file; ` +
+                `only <udm.DeploymentPackage> or <udm.ProvisioningPackage> are allowed.`
+            );
+        }
+
+        const newXml = Util.buildXml(xmlObj);
+        await fs.promises.writeFile(manifestPath, newXml, "utf8");
     }
 }
 
