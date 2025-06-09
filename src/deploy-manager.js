@@ -1,48 +1,78 @@
+const core = require('@actions/core');
 const axios = require('axios');
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const FormData = require('form-data');
 const Util = require('./util');
-const Zip = require('./zip');
 
 class DeployManager {
 
   static serverConfig;
 
   // General API request method
+  // deploy-manager.js
+
   static async apiRequest(endpoint, method, data, headers) {
     const { url, username, password } = this.serverConfig;
+
+    // build axios config
+    const config = {
+      url: `${url}${endpoint}`,
+      method: method.toUpperCase(),
+      headers,
+      auth: { username, password }
+    };
+
+    // only attach a body when it’s not a GET
+    if (config.method !== 'GET') {
+      config.data = data;
+    }
+
     try {
-      const response = await axios({
-        url: `${url}${endpoint}`,
-        method,
-        headers,
-        auth: { username, password },
-        data
-      });
+      const response = await axios(config);
       return response.data;
     } catch (error) {
       const statusCode = error.response ? error.response.status : 'No response';
       const errorData = error.response ? error.response.data : error.message;
-      console.error(`Error with ${method.toUpperCase()} request to ${endpoint}: Status Code: ${statusCode}, Data:`, errorData);
+      console.error(
+        `Error with ${config.method} request to ${endpoint}: ` +
+        `Status Code: ${statusCode}, Data:`, errorData
+      );
       throw new Error(`Request failed with status ${statusCode}: ${JSON.stringify(errorData)}`);
     }
   }
 
+
   // Publish a package
   static async publishPackage(packageFullPath) {
     const packageName = path.basename(packageFullPath);
-    const fileData = fs.readFileSync(packageFullPath);
+    try {
+      await fsp.access(packageFullPath);
+    } catch {
+      throw new Error(`Package DAR file not found at: ${packageFullPath}`);
+    }
+
+    const fileStream = fs.createReadStream(packageFullPath);
     const formData = new FormData();
-    formData.append('fileData', fileData, packageName);
+    formData.append('fileData', fileStream, packageName);
 
     const headers = formData.getHeaders();
     const endpoint = `/deployit/package/upload/${packageName}`;
     const method = 'POST';
 
     const response = await this.apiRequest(endpoint, method, formData, headers);
-    console.log(`Package ${packageName} published successfully!`);
-    return response;
+    console.log(`Package ${packageName} published successfully! Package ID: ${response.id}`);
+    core.setOutput('deploymentPackageId', response.id);
+    await core.summary
+      .addHeading("Package Publish Summary")
+      .addList([
+        `Package full path: <i>${packageFullPath}</i>`,
+        `Package <i>${packageName}</i> published successfully!<br/>`,
+        `Package ID: <i>${response.id}</i><br/>`
+      ], false)
+      .write();
+    return response.id;
   }
 
   // Get server state
@@ -58,53 +88,108 @@ class DeployManager {
   }
 
   // Deploy a package
-  static async deployPackage(packageFullPath, targetEnvironment, rollback) {
+  static async deployPackage(deploymentPackageId, targetEnvironment, rollback, serverUrl) {
     if (!Util.startsWith(targetEnvironment, "Environments/", true)) {
       targetEnvironment = `Environments/${targetEnvironment}`;
     }
 
     if (!await this.environmentExists(targetEnvironment)) {
       throw new Error(`Specified environment ${targetEnvironment} doesn't exists.`);
+    } else {
+      console.log(`Environment ${targetEnvironment} exists.`);
     }
 
-    const manifest = await Zip.getManifestFromPackage(packageFullPath);
-    const application = await Util.getApplication(manifest);
-    const version = await Util.getVersion(manifest);
-    const deploymentPackageId = `Applications/${application}/${version}`;
+    console.log(`Starting deployment of package Id ${deploymentPackageId} to ${targetEnvironment}`);
 
-    console.log(`Package name is ${deploymentPackageId}`);
-    console.log(`Starting deployment to ${targetEnvironment}.`);
+    const deploymentTaskId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
+    console.log(`New deployment task has been successfully created with id ${deploymentTaskId}`);
 
-    const deploymentId = await this.createDeploymentTask(deploymentPackageId, targetEnvironment);
-    console.log(`New deployment task has been successfully created with id ${deploymentId}.`);
+    const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
 
-    await this.startDeploymentTask(deploymentId);
-    const taskOutcome = await this.waitForTask(deploymentId);
+    core.setOutput('deploymentTaskId', deploymentTaskId);
+
+    await this.startDeploymentTask(deploymentTaskId);
+    const taskOutcome = await this.waitForTask(deploymentTaskId);
 
     if (taskOutcome === "EXECUTED" || taskOutcome === "DONE") {
       // Archive the deployment task
-      await this.archiveDeploymentTask(deploymentId);
-      console.log(`Successfully deployed to ${targetEnvironment}.`);
+      await this.archiveDeploymentTask(deploymentTaskId);
+      const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
+      await core.summary
+        .addHeading('Deployment Summary')
+        .addList([
+          `Deployment package Id: <i>${deploymentPackageId}</i>`,
+          `Target environment: <i>${targetEnvironment}</i>`,
+          `Deployment task Id: <i>${deploymentTaskId}</i>`,
+          `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+        ], false)
+        .write();
+      console.log(`Successfully deployed to ${targetEnvironment}`);
     } else {
       if (taskOutcome === "FAILED") {
         console.log("Deployment failed");
       }
       if (rollback === 'false') {
+        const deploymentUrl = `${serverUrl}/#/explorer?taskId=${deploymentTaskId}`;
+        await core.summary
+          .addHeading('Deployment Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Deployment task Id: <i>${deploymentTaskId}</i>`,
+            `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
         throw new Error("Deployment failed");
       }
 
-      console.log("Starting rollback.");
-      const rollbackTaskId = await this.createRollbackTask(deploymentId);
+      console.log("Starting rollback process...");
+      const rollbackTaskId = await this.createRollbackTask(deploymentTaskId);
+      console.log(`Rollback task created with id ${rollbackTaskId}`);
+      core.setOutput('rollbackTaskId', rollbackTaskId);
       await this.startDeploymentTask(rollbackTaskId);
+
+      const deploymentUrl = `${serverUrl}/#/reports/deployments?taskId=${deploymentTaskId}`;
+      await core.summary
+        .addHeading('Deployment Summary')
+        .addList([
+          `Deployment package Id: <i>${deploymentPackageId}</i>`,
+          `Target environment: <i>${targetEnvironment}</i>`,
+          `Deployment task Id: <i>${deploymentTaskId}</i>`,
+          `<a href="${deploymentUrl}">View deployment details in Digital.ai Deploy UI</a>`
+        ], false)
+        .write();
+
       const rollbackTaskOutcome = await this.waitForTask(rollbackTaskId);
 
       if (rollbackTaskOutcome === "EXECUTED" || rollbackTaskOutcome === "DONE") {
         // Archive the rollback task
         await this.archiveDeploymentTask(rollbackTaskId);
-        console.log("Deployment failed - Rollback executed successfully.");
-        throw new Error("Deployment failed - Rollback executed successfully.");
+        const rollbackUrl = `${serverUrl}/#/reports/deployments?taskId=${rollbackTaskId}`;
+        await core.summary
+          .addHeading('Rollback Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Rollback task Id: <i>${rollbackTaskId}</i>`,
+            `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
+        console.log("Rollback executed successfully");
+        throw new Error("Deployment failed - Rollback executed successfully");
       } else {
-        throw new Error("Rollback failed.");
+        const rollbackUrl = `${serverUrl}/#/explorer?taskId=${rollbackTaskId}`;
+        await core.summary
+          .addHeading('Rollback Summary')
+          .addList([
+            `Deployment package Id: <i>${deploymentPackageId}</i>`,
+            `Target environment: <i>${targetEnvironment}</i>`,
+            `Rollback task Id: <i>${rollbackTaskId}</i>`,
+            `<a href="${rollbackUrl}">View rollback details in Digital.ai Deploy UI</a>`
+          ], false)
+          .write();
+        console.log("Rollback failed");
+        throw new Error("Rollback failed");
       }
     }
   }

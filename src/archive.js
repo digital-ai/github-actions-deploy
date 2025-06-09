@@ -1,12 +1,15 @@
+const core = require('@actions/core');
 const archiver = require("archiver");
 const fs = require("fs");
+const fsp = fs.promises;
 const path = require("path");
 const xml2js = require("xml2js");
+const Util = require('./util');
 
 class Archive {
     // Parse the manifest XML file and extract paths of files to be included in the package
     static async getPathsFromManifest(manifestPath) {
-        const manifest = fs.readFileSync(manifestPath, "utf8");
+        const manifest = await fsp.readFile(manifestPath, "utf8");
         const xml = await new Promise((resolve, reject) => {
             xml2js.parseString(manifest, { explicitArray: false }, (err, json) => {
                 if (err) {
@@ -17,7 +20,7 @@ class Archive {
             });
         });
 
-        const filesToInclude = new Set(["deployit-manifest.xml"]);
+        const filesToInclude = new Set([`deployit-manifest.xml`]);
         const deployables = xml["udm.DeploymentPackage"].deployables;
 
         for (const deployable in deployables) {
@@ -38,47 +41,84 @@ class Archive {
     }
 
     // Create a new DAR package using the manifest file
-    static async createNewDarPackage(manifestPath, outputPath, packageName) {
+    static async createNewDarPackage(manifestPath, outputPath, packageName, versionNumber) {
         try {
-            const rootPath = process.cwd();
-            const manifestFileFullPath = path.join(rootPath, "deployit-manifest.xml");
 
-            // Copy the manifest file to the current working directory
-            if (fs.existsSync(manifestFileFullPath)) {
-                //console.log("Manifest file already present in staging folder. The current file will be overwritten with the source manifest file.");
+            const rootPath = process.cwd();
+            const tmpDir = path.join(rootPath, 'tmp-dai');
+            try {
+                await fsp.access(tmpDir);
+                core.info(`Temporary directory already exists: ${tmpDir}. Removing it...`);
+                await fsp.rm(tmpDir, { recursive: true, force: true });
+            } catch {
+                // not present, no cleanup needed
             }
-            fs.copyFileSync(manifestPath, manifestFileFullPath);
+            core.info(`Creating temporary directory for manifest : ${tmpDir}`);
+            await fsp.mkdir(tmpDir);
+
+            const tmpManifestPath = path.join(tmpDir, 'deployit-manifest.xml');
+            await fsp.copyFile(manifestPath, tmpManifestPath);
+            core.info(`Copied original manifest from '${manifestPath}' to temporary manifest at '${tmpManifestPath}'`);
+
+            if (versionNumber) {
+                await Util.setVersion(tmpManifestPath, versionNumber);
+                core.info(`Updated version number '${versionNumber}' in manifest at '${tmpManifestPath}'`);
+            } else {
+                core.info(`No version number provided, skipping version update in manifest at '${tmpManifestPath}'`);
+            }
 
             // Create the output directory if it doesn't exist
-            if (path.isAbsolute(outputPath) && !fs.existsSync(outputPath)) {
-                console.log(`Output path not found, creating folder structure: ${outputPath}`);
-                fs.mkdirSync(outputPath, { recursive: true });
+            try {
+                await fsp.access(outputPath);
+                core.info(`Output path already exists: ${outputPath}`);
+            } catch {
+                core.info(`Output path not found, creating folder structure: ${outputPath}`);
+                await fsp.mkdir(outputPath, { recursive: true });
             }
 
             // Set the package name, ensuring it ends with .dar
             if (!packageName) {
+                core.info("No package name provided, using default 'package.dar'");
                 packageName = "package.dar";
             } else if (!packageName.toLowerCase().endsWith(".dar")) {
                 packageName = packageName + ".dar";
             }
 
-            var packageFullPath = path.join(outputPath, packageName);
-            console.log(`Package path set: ${packageFullPath}`);
+            const packageFullPath = path.join(outputPath, packageName);
+            core.info(`Package path set: ${packageFullPath}`);
 
             // Throw an error if a package already exists at the target path
-            if (fs.existsSync(packageFullPath)) {
+            try {
+                await fsp.access(packageFullPath);
                 throw new Error(`A DAR package already exists at ${packageFullPath}.`);
+            } catch {
+                // file doesn't exist — OK to proceed
             }
 
             const filesToInclude = await Archive.getPathsFromManifest(manifestPath);
-            console.log(`Files to include in the package = ${filesToInclude}`);
+            core.info(`Files to include in the package = ${filesToInclude}`);
 
+            core.info('Creating DAR package with the following parameters:');
             await Archive.compressPackage(packageFullPath, filesToInclude, rootPath);
-            console.log("Package created at:", packageFullPath);
+            core.info(`Package created at: ${packageFullPath}`);
 
-            return packageFullPath;
+            const packageRelativePath = path.relative(process.cwd(), packageFullPath);
+
+            core.setOutput('darPackagePath', packageRelativePath);
+            await core.summary
+                .addHeading("Package Creation Summary")
+                .addList([
+                    `Input manifest full path: <i>${manifestPath}</i>`,
+                    `Package name: <i>${packageName}</i>`,
+                    `Package version: <i>${versionNumber || 'taken from input manifest file'}</i>`,
+                    `Package created successfully at <i>${packageRelativePath}</i><br/>`
+                ], false)
+                .write();
+
+            return packageRelativePath;
+
         } catch (error) {
-            console.error("Error creating package:", error);
+            core.info("Error in creating the DAR package....");
             throw error;
         }
     }
@@ -91,9 +131,22 @@ class Archive {
         archive.pipe(output);
 
         for (const entry of filesToInclude) {
-            const fullyEntryPath = path.join(rootPath, entry);
+            
+            let fullyEntryPath;
+            if (entry === "deployit-manifest.xml") {
+                fullyEntryPath = path.join(rootPath, "tmp-dai", entry);
+            } else {
+                fullyEntryPath = path.join(rootPath, entry);
+            }
+            core.info(`Adding entry: ${entry} from path: ${fullyEntryPath}`);
 
-            if (fs.statSync(fullyEntryPath).isDirectory()) {
+            try {
+                await fsp.access(fullyEntryPath);
+            } catch {
+                throw new Error(`File not found: ${fullyEntryPath}`);
+            }
+            const stats = await fsp.stat(fullyEntryPath);
+            if (stats.isDirectory()) {
                 archive.directory(fullyEntryPath, entry);
             } else {
                 archive.append(fs.createReadStream(fullyEntryPath), { name: entry });
