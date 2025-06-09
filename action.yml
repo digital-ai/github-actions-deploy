@@ -7,39 +7,52 @@ branding:
 
 inputs:
   serverUrl:
-    description: 'The URL of the Digital.ai Deploy server.'
+    description: 'The URL of the Digital.ai Deploy server'
     required: true
   username:
-    description: 'The username for authenticating with Digital.ai Deploy.'
+    description: 'The username for authenticating with Digital.ai Deploy'
     required: true
   password:
-    description: 'The password for authenticating with Digital.ai Deploy.'
+    description: 'The password for authenticating with Digital.ai Deploy'
     required: true
   action:
-    description: 'Action to perform: create, publish, deploy. Default is create, publish, and deploy.'
+    description: 'Action to perform: create, publish, deploy. Default is create, publish, and deploy'
     required: false
     default: 'create_publish_deploy'    
   manifestPath:
-    description: 'The path to the deployit-manifest.xml file.'
+    description: 'The path to the manifest xml file'
     required: false
   outputPath:
-    description: 'The path for storing the newly created DAR package.'
+    description: 'The path for storing the newly created DAR package'
     required: false
   packageName:
-    description: 'The name of the newly created DAR package.'
+    description: 'The name of the newly created DAR package'
     required: false    
   versionNumber:
-    description: 'Specify a version number to set in your manifest file.'
+    description: 'Specify a version number to set in your manifest file'
     required: false    
   darPackagePath:
-    description: 'The path to the DAR package.'
+    description: 'The path to the DAR package'
+    required: false
+  deploymentPackageId:
+    description: 'The ID of the package to be deployed'
     required: false
   environmentId:
-    description: 'ID of the target environment in Digital.ai Deploy.'
+    description: 'The ID of the target environment in Digital.ai Deploy'
     required: false
   rollback:
-    description: 'Invoke a rollback in case of deployment failure.'
+    description: 'Invoke a rollback in case of deployment failure'
     required: false
+
+outputs:
+  deploymentPackageId:
+    description: 'The ID of the published package' 
+  darPackagePath:
+    description: 'The relative path to the DAR package created by the action'
+  deploymentTaskId:
+    description: 'The ID of the deployment task created by the action'
+  rollbackTaskId:
+    description: 'The ID of the rollback task created by the action'
 
 runs:
   using: 'node20'
