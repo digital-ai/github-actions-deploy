@@ -1,38 +1,42 @@
 const { run } = require('../src/index');
 const core = require('@actions/core');
 const DeployManager = require('../src/deploy-manager');
-const fs = require('fs');
 
 jest.mock('@actions/core');
 jest.mock('../src/deploy-manager');
 
-
 describe('Invalid Inputs', () => {
     beforeEach(() => {
-        // Reset the mock implementation for core.getInput and DeployManager.getServerState before each test
+        // Reset mocks
         core.getInput.mockReset();
+        core.setFailed.mockReset();
+        core.error.mockReset();
+        // Stub core.summary to avoid undefined errors
+        core.summary = {
+            addHeading: jest.fn().mockReturnThis(),
+            addSeparator: jest.fn().mockReturnThis(),
+            addCodeBlock: jest.fn().mockReturnThis(),
+            write: jest.fn().mockResolvedValue(),
+        };
         DeployManager.getServerState.mockReset();
     });
 
     test('Missing serverUrl, username, and password', async () => {
-        // Mocking inputs
+        // Mocking inputs: only action provided
         core.getInput.mockImplementation((name) => {
-            switch (name) {
-                case 'action':
-                    return 'create_publish_deploy';
-                // Missing serverUrl, username, and password
-                default:
-                    return '';
-            }
+            if (name === 'action') return 'create_publish_deploy';
+            return '';
         });
 
         await run();
 
-        expect(core.setFailed).toHaveBeenCalledWith('serverUrl, username, and password are required.');
+        expect(core.setFailed).toHaveBeenCalledWith(
+            'serverUrl, username, and password are required for all actions.'
+        );
     });
 
     test('Missing manifestPath, darPackagePath, and environmentId', async () => {
-        // Mocking inputs
+        // Mocking inputs: server connection inputs provided, rest missing
         core.getInput.mockImplementation((name) => {
             switch (name) {
                 case 'action':
@@ -43,7 +47,6 @@ describe('Invalid Inputs', () => {
                     return 'testuser';
                 case 'password':
                     return 'testpassword';
-                // Other necessary inputs
                 default:
                     return '';
             }
@@ -53,7 +56,8 @@ describe('Invalid Inputs', () => {
 
         await run();
 
-        expect(core.setFailed).toHaveBeenCalledWith("manifestPath is required for action 'create_publish_deploy'.");
+        expect(core.setFailed).toHaveBeenCalledWith(
+            "Input 'manifestPath' is required for action 'create_publish_deploy'."
+        );
     });
-
 });
