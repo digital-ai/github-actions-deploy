@@ -302,14 +302,33 @@ class DeployManager {
   // Wait for task to complete
   static async waitForTask(taskId) {
     const runningStates = ["QUEUED", "EXECUTING", "ABORTING", "STOPPING", "FAILING", "PENDING"];
-    let task = await this.getDeploymentTask(taskId);
-
-    while (runningStates.indexOf(task.state) > -1) {
+    const maxTransientRetries = 5;
+    let transientAttempts = 0;
+    let task;
+    while (true) {
+      try {
+        task = await this.getDeploymentTask(taskId);
+        // If it's no longer in a running state, we're done
+        if (!runningStates.includes(task.state)) {
+          return task.state;
+        }
+        // Reset transient counter on a successful fetch
+        transientAttempts = 0;
+      } catch (error) {
+        // Handle the specific 500 “cannot create children…” error as transient
+        const msg = error.message || "";
+        if (msg.includes("500") && msg.includes("cannot create children while terminating or terminated") && transientAttempts < maxTransientRetries) {
+          transientAttempts++;
+          console.log(`Transient error checking task status (attempt ${transientAttempts}/${maxTransientRetries}): ${msg}  Retrying in ${transientAttempts * 5}s…`);
+          await this.sleepFor(transientAttempts * 5);
+          continue;
+        }
+        // For any other error (or too many retries), rethrow
+        throw error;
+      }
+      // Wait before the next status check
       await this.sleepFor(5);
-      task = await this.getDeploymentTask(taskId);
     }
-
-    return task.state;
   }
 
   // Archive deployment task
