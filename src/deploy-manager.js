@@ -10,6 +10,8 @@ class DeployManager {
 
   static serverConfig;
 
+  static maxTransientRetries = 5; // Default to 5 retries if not set
+
   // General API request method
   // deploy-manager.js
 
@@ -302,7 +304,6 @@ class DeployManager {
   // Wait for task to complete
   static async waitForTask(taskId) {
     const runningStates = ["QUEUED", "EXECUTING", "ABORTING", "STOPPING", "FAILING", "PENDING"];
-    const maxTransientRetries = 5;
     let transientAttempts = 0;
     let task;
     while (true) {
@@ -317,9 +318,9 @@ class DeployManager {
       } catch (error) {
         // Handle the specific 500 “cannot create children…” error as transient
         const msg = error.message || "";
-        if (msg.includes("500") && msg.includes("cannot create children while terminating or terminated") && transientAttempts < maxTransientRetries) {
+        if (msg.includes("500") && msg.includes("cannot create children while terminating or terminated") && transientAttempts < this.maxTransientRetries) {
           transientAttempts++;
-          console.log(`Transient error checking task status (attempt ${transientAttempts}/${maxTransientRetries}): ${msg}  Retrying in ${transientAttempts * 5}s…`);
+          console.log(`Transient error checking task status (attempt ${transientAttempts}/${this.maxTransientRetries}): ${msg}  Retrying in ${transientAttempts * 5}s…`);
           await this.sleepFor(transientAttempts * 5);
           continue;
         }
