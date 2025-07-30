@@ -67,6 +67,9 @@ async function run() {
     const deploymentPackageIdInput = core.getInput('deploymentPackageId'); // Renamed to avoid conflict with local variable
     const environmentId = core.getInput('environmentId');
     const rollback = core.getInput('rollback') || 'false';
+    const maxTransientRetries = parseInt(core.getInput('maxTransientRetries'), 10) || 5; // Default to 5 retries if not set
+    
+    DeployManager.maxTransientRetries = maxTransientRetries; // Set the max transient retries for DeployManager
 
     function logNonEmptyInputs() {
       const inputs = {
@@ -78,7 +81,8 @@ async function run() {
         darPackagePath: darPackagePathInput,
         deploymentPackageId: deploymentPackageIdInput,
         environmentId,
-        rollback
+        rollback,
+        maxTransientRetries
       };
 
       core.info('Provided action inputs:');

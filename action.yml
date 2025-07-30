@@ -43,6 +43,9 @@ inputs:
   rollback:
     description: 'Invoke a rollback in case of deployment failure'
     required: false
+  maxTransientRetries:
+    description: 'The maximum number of retries when encountering transient errors'
+    required: false
 
 outputs:
   deploymentPackageId:
