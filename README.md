@@ -58,6 +58,7 @@ During execution, this action creates a temporary directory named **`tmp-dai`** 
 | `username`  | Username for Digital.ai Deploy authentication.              | Yes      | N/A     |
 | `password`  | Password for Digital.ai Deploy authentication. | Yes      | N/A     |
 | `action`    | Specifies the operation(s). One of: `create`, `publish`, `deploy`, `create_publish`, `publish_deploy`, `create_publish_deploy` | No | `create_publish_deploy` |
+| `maxTransientRetries`  | The maximum number of retries when encountering transient errors. | No      | 5     |
 
 ---
 
