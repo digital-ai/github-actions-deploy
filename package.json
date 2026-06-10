@@ -27,18 +27,17 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@actions/github": "^6.0.0"
+    "@actions/core": "^2.0.3",
+    "archiver": "^7.0.1",
+    "axios": "^1.17.0",
+    "node-stream-zip": "^1.15.0",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
-    "@actions/core": "^1.11.1",
     "@jest/core": "^29.7.0",
     "@types/jest": "^29.5.14",
     "@vercel/ncc": "^0.38.3",
-    "archiver": "^7.0.1",
-    "axios": "^1.9.0",
-    "jest": "^29.7.0",
-    "node-stream-zip": "^1.15.0",
-    "xml2js": "^0.6.2"
+    "jest": "^29.7.0"
   },
   "jest": {
     "verbose": true,
