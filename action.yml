@@ -58,5 +58,5 @@ outputs:
     description: 'The ID of the rollback task created by the action'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
