@@ -3835,7 +3835,7 @@ var difference = __nccwpck_require__(7294);
 var union = __nccwpck_require__(3270);
 var isPlainObject = __nccwpck_require__(6542);
 
-var glob = __nccwpck_require__(6171);
+var glob = __nccwpck_require__(1363);
 
 var file = module.exports = {};
 
@@ -4191,218 +4191,6 @@ utils.walkdir = function(dirpath, base, callback) {
     })();
   });
 };
-
-
-/***/ }),
-
-/***/ 4507:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var balanced = __nccwpck_require__(9380);
-
-module.exports = expandTop;
-
-var escSlash = '\0SLASH'+Math.random()+'\0';
-var escOpen = '\0OPEN'+Math.random()+'\0';
-var escClose = '\0CLOSE'+Math.random()+'\0';
-var escComma = '\0COMMA'+Math.random()+'\0';
-var escPeriod = '\0PERIOD'+Math.random()+'\0';
-
-function numeric(str) {
-  return parseInt(str, 10) == str
-    ? parseInt(str, 10)
-    : str.charCodeAt(0);
-}
-
-function escapeBraces(str) {
-  return str.split('\\\\').join(escSlash)
-            .split('\\{').join(escOpen)
-            .split('\\}').join(escClose)
-            .split('\\,').join(escComma)
-            .split('\\.').join(escPeriod);
-}
-
-function unescapeBraces(str) {
-  return str.split(escSlash).join('\\')
-            .split(escOpen).join('{')
-            .split(escClose).join('}')
-            .split(escComma).join(',')
-            .split(escPeriod).join('.');
-}
-
-
-// Basically just str.split(","), but handling cases
-// where we have nested braced sections, which should be
-// treated as individual members, like {a,{b,c},d}
-function parseCommaParts(str) {
-  if (!str)
-    return [''];
-
-  var parts = [];
-  var m = balanced('{', '}', str);
-
-  if (!m)
-    return str.split(',');
-
-  var pre = m.pre;
-  var body = m.body;
-  var post = m.post;
-  var p = pre.split(',');
-
-  p[p.length-1] += '{' + body + '}';
-  var postParts = parseCommaParts(post);
-  if (post.length) {
-    p[p.length-1] += postParts.shift();
-    p.push.apply(p, postParts);
-  }
-
-  parts.push.apply(parts, p);
-
-  return parts;
-}
-
-function expandTop(str, options) {
-  if (!str)
-    return [];
-
-  options = options || {};
-  var max = options.max == null ? Infinity : options.max;
-
-  // I don't know why Bash 4.3 does this, but it does.
-  // Anything starting with {} will have the first two bytes preserved
-  // but *only* at the top level, so {},a}b will not expand to anything,
-  // but a{},b}c will be expanded to [a}c,abc].
-  // One could argue that this is a bug in Bash, but since the goal of
-  // this module is to match Bash's rules, we escape a leading {}
-  if (str.substr(0, 2) === '{}') {
-    str = '\\{\\}' + str.substr(2);
-  }
-
-  return expand(escapeBraces(str), max, true).map(unescapeBraces);
-}
-
-function embrace(str) {
-  return '{' + str + '}';
-}
-function isPadded(el) {
-  return /^-?0\d/.test(el);
-}
-
-function lte(i, y) {
-  return i <= y;
-}
-function gte(i, y) {
-  return i >= y;
-}
-
-function expand(str, max, isTop) {
-  var expansions = [];
-
-  var m = balanced('{', '}', str);
-  if (!m) return [str];
-
-  // no need to expand pre, since it is guaranteed to be free of brace-sets
-  var pre = m.pre;
-  var post = m.post.length
-    ? expand(m.post, max, false)
-    : [''];
-
-  if (/\$$/.test(m.pre)) {    
-    for (var k = 0; k < post.length && k < max; k++) {
-      var expansion = pre+ '{' + m.body + '}' + post[k];
-      expansions.push(expansion);
-    }
-  } else {
-    var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
-    var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
-    var isSequence = isNumericSequence || isAlphaSequence;
-    var isOptions = m.body.indexOf(',') >= 0;
-    if (!isSequence && !isOptions) {
-      // {a},b}
-      if (m.post.match(/,(?!,).*\}/)) {
-        str = m.pre + '{' + m.body + escClose + m.post;
-        return expand(str, max, true);
-      }
-      return [str];
-    }
-
-    var n;
-    if (isSequence) {
-      n = m.body.split(/\.\./);
-    } else {
-      n = parseCommaParts(m.body);
-      if (n.length === 1) {
-        // x{{a,b}}y ==> x{a}y x{b}y
-        n = expand(n[0], max, false).map(embrace);
-        if (n.length === 1) {
-          return post.map(function(p) {
-            return m.pre + n[0] + p;
-          });
-        }
-      }
-    }
-
-    // at this point, n is the parts, and we know it's not a comma set
-    // with a single entry.
-    var N;
-
-    if (isSequence) {
-      var x = numeric(n[0]);
-      var y = numeric(n[1]);
-      var width = Math.max(n[0].length, n[1].length)
-      var incr = n.length == 3
-        ? Math.max(Math.abs(numeric(n[2])), 1)
-        : 1;
-      var test = lte;
-      var reverse = y < x;
-      if (reverse) {
-        incr *= -1;
-        test = gte;
-      }
-      var pad = n.some(isPadded);
-
-      N = [];
-
-      for (var i = x; test(i, y) && N.length < max; i += incr) {
-        var c;
-        if (isAlphaSequence) {
-          c = String.fromCharCode(i);
-          if (c === '\\')
-            c = '';
-        } else {
-          c = String(i);
-          if (pad) {
-            var need = width - c.length;
-            if (need > 0) {
-              var z = new Array(need + 1).join('0');
-              if (i < 0)
-                c = '-' + z + c.slice(1);
-              else
-                c = z + c;
-            }
-          }
-        }
-        N.push(c);
-      }
-    } else {
-      N = [];
-
-      for (var j = 0; j < n.length; j++) {
-        N.push.apply(N, expand(n[j], max, false));
-      }
-    }
-
-    for (var j = 0; j < N.length; j++) {
-      for (var k = 0; k < post.length && expansions.length < max; k++) {
-        var expansion = pre + N[j] + post[k];
-        if (!isTop || isSequence || expansion)
-          expansions.push(expansion);
-      }
-    }
-  }
-
-  return expansions;
-}
 
 
 /***/ }),
@@ -6209,7 +5997,6 @@ module.exports = Zip;
     // A temporary value used to identify if the loop should be broken.
     // See #1064, #1293
     const breakLoop = {};
-    var breakLoop$1 = breakLoop;
 
     function once(fn) {
         function wrapper (...args) {
@@ -6320,7 +6107,7 @@ module.exports = Zip;
                 return
             }
 
-            if (result === breakLoop$1 || (done && running <= 0)) {
+            if (result === breakLoop || (done && running <= 0)) {
                 done = true;
                 //console.log('done iterCb')
                 return callback(null);
@@ -6370,7 +6157,7 @@ module.exports = Zip;
                     done = true;
                     canceled = true;
                 }
-                else if (value === breakLoop$1 || (done && running <= 0)) {
+                else if (value === breakLoop || (done && running <= 0)) {
                     done = true;
                     return callback(null);
                 }
@@ -6445,7 +6232,7 @@ module.exports = Zip;
             if (canceled === true) return
             if (err) {
                 callback(err);
-            } else if ((++completed === length) || value === breakLoop$1) {
+            } else if ((++completed === length) || value === breakLoop) {
                 callback(null);
             }
         }
@@ -7141,8 +6928,8 @@ module.exports = Zip;
         return callback[PROMISE_SYMBOL]
     }
 
-    var FN_ARGS = /^(?:async\s+)?(?:function)?\s*\w*\s*\(\s*([^)]+)\s*\)(?:\s*{)/;
-    var ARROW_FN_ARGS = /^(?:async\s+)?\(?\s*([^)=]+)\s*\)?(?:\s*=>)/;
+    var FN_ARGS = /^(?:async\s)?(?:function)?\s*(?:\w+\s*)?\(([^)]+)\)(?:\s*{)/;
+    var ARROW_FN_ARGS = /^(?:async\s)?\s*(?:\(\s*)?((?:[^)=\s]\s*)*)(?:\)\s*)?=>/;
     var FN_ARG_SPLIT = /,/;
     var FN_ARG = /(=.+)?(\s*)$/;
 
@@ -8265,7 +8052,7 @@ module.exports = Zip;
                     if (check(result) && !testResult) {
                         testPassed = true;
                         testResult = getResult(true, value);
-                        return callback(null, breakLoop$1);
+                        return callback(null, breakLoop);
                     }
                     callback();
                 });
@@ -12454,121 +12241,153 @@ function descending(a, b)
 /***/ 3057:
 /***/ ((module) => {
 
-function isBuffer (value) {
+function isBuffer(value) {
   return Buffer.isBuffer(value) || value instanceof Uint8Array
 }
 
-function isEncoding (encoding) {
+function isEncoding(encoding) {
   return Buffer.isEncoding(encoding)
 }
 
-function alloc (size, fill, encoding) {
+function alloc(size, fill, encoding) {
   return Buffer.alloc(size, fill, encoding)
 }
 
-function allocUnsafe (size) {
+function allocUnsafe(size) {
   return Buffer.allocUnsafe(size)
 }
 
-function allocUnsafeSlow (size) {
+function allocUnsafeSlow(size) {
   return Buffer.allocUnsafeSlow(size)
 }
 
-function byteLength (string, encoding) {
+function byteLength(string, encoding) {
   return Buffer.byteLength(string, encoding)
 }
 
-function compare (a, b) {
+function compare(a, b) {
   return Buffer.compare(a, b)
 }
 
-function concat (buffers, totalLength) {
+function concat(buffers, totalLength) {
   return Buffer.concat(buffers, totalLength)
 }
 
-function copy (source, target, targetStart, start, end) {
+function copy(source, target, targetStart, start, end) {
   return toBuffer(source).copy(target, targetStart, start, end)
 }
 
-function equals (a, b) {
+function equals(a, b) {
   return toBuffer(a).equals(b)
 }
 
-function fill (buffer, value, offset, end, encoding) {
+function fill(buffer, value, offset, end, encoding) {
   return toBuffer(buffer).fill(value, offset, end, encoding)
 }
 
-function from (value, encodingOrOffset, length) {
+function from(value, encodingOrOffset, length) {
   return Buffer.from(value, encodingOrOffset, length)
 }
 
-function includes (buffer, value, byteOffset, encoding) {
+function includes(buffer, value, byteOffset, encoding) {
   return toBuffer(buffer).includes(value, byteOffset, encoding)
 }
 
-function indexOf (buffer, value, byfeOffset, encoding) {
+function indexOf(buffer, value, byfeOffset, encoding) {
   return toBuffer(buffer).indexOf(value, byfeOffset, encoding)
 }
 
-function lastIndexOf (buffer, value, byteOffset, encoding) {
+function lastIndexOf(buffer, value, byteOffset, encoding) {
   return toBuffer(buffer).lastIndexOf(value, byteOffset, encoding)
 }
 
-function swap16 (buffer) {
+function swap16(buffer) {
   return toBuffer(buffer).swap16()
 }
 
-function swap32 (buffer) {
+function swap32(buffer) {
   return toBuffer(buffer).swap32()
 }
 
-function swap64 (buffer) {
+function swap64(buffer) {
   return toBuffer(buffer).swap64()
 }
 
-function toBuffer (buffer) {
+function toBuffer(buffer) {
   if (Buffer.isBuffer(buffer)) return buffer
   return Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength)
 }
 
-function toString (buffer, encoding, start, end) {
+function toString(buffer, encoding, start, end) {
   return toBuffer(buffer).toString(encoding, start, end)
 }
 
-function write (buffer, string, offset, length, encoding) {
+function write(buffer, string, offset, length, encoding) {
   return toBuffer(buffer).write(string, offset, length, encoding)
 }
 
-function writeDoubleLE (buffer, value, offset) {
-  return toBuffer(buffer).writeDoubleLE(value, offset)
+function readDoubleBE(buffer, offset) {
+  return toBuffer(buffer).readDoubleBE(offset)
 }
 
-function writeFloatLE (buffer, value, offset) {
-  return toBuffer(buffer).writeFloatLE(value, offset)
-}
-
-function writeUInt32LE (buffer, value, offset) {
-  return toBuffer(buffer).writeUInt32LE(value, offset)
-}
-
-function writeInt32LE (buffer, value, offset) {
-  return toBuffer(buffer).writeInt32LE(value, offset)
-}
-
-function readDoubleLE (buffer, offset) {
+function readDoubleLE(buffer, offset) {
   return toBuffer(buffer).readDoubleLE(offset)
 }
 
-function readFloatLE (buffer, offset) {
+function readFloatBE(buffer, offset) {
+  return toBuffer(buffer).readFloatBE(offset)
+}
+
+function readFloatLE(buffer, offset) {
   return toBuffer(buffer).readFloatLE(offset)
 }
 
-function readUInt32LE (buffer, offset) {
+function readInt32BE(buffer, offset) {
+  return toBuffer(buffer).readInt32BE(offset)
+}
+
+function readInt32LE(buffer, offset) {
+  return toBuffer(buffer).readInt32LE(offset)
+}
+
+function readUInt32BE(buffer, offset) {
+  return toBuffer(buffer).readUInt32BE(offset)
+}
+
+function readUInt32LE(buffer, offset) {
   return toBuffer(buffer).readUInt32LE(offset)
 }
 
-function readInt32LE (buffer, offset) {
-  return toBuffer(buffer).readInt32LE(offset)
+function writeDoubleBE(buffer, value, offset) {
+  return toBuffer(buffer).writeDoubleBE(value, offset)
+}
+
+function writeDoubleLE(buffer, value, offset) {
+  return toBuffer(buffer).writeDoubleLE(value, offset)
+}
+
+function writeFloatBE(buffer, value, offset) {
+  return toBuffer(buffer).writeFloatBE(value, offset)
+}
+
+function writeFloatLE(buffer, value, offset) {
+  return toBuffer(buffer).writeFloatLE(value, offset)
+}
+
+function writeInt32BE(buffer, value, offset) {
+  return toBuffer(buffer).writeInt32BE(value, offset)
+}
+
+function writeInt32LE(buffer, value, offset) {
+  return toBuffer(buffer).writeInt32LE(value, offset)
+}
+
+function writeUInt32BE(buffer, value, offset) {
+  return toBuffer(buffer).writeUInt32BE(value, offset)
+}
+
+function writeUInt32LE(buffer, value, offset) {
+  return toBuffer(buffer).writeUInt32LE(value, offset)
 }
 
 module.exports = {
@@ -12593,14 +12412,22 @@ module.exports = {
   toBuffer,
   toString,
   write,
-  writeDoubleLE,
-  writeFloatLE,
-  writeUInt32LE,
-  writeInt32LE,
+  readDoubleBE,
   readDoubleLE,
+  readFloatBE,
   readFloatLE,
+  readInt32BE,
+  readInt32LE,
+  readUInt32BE,
   readUInt32LE,
-  readInt32LE
+  writeDoubleBE,
+  writeDoubleLE,
+  writeFloatBE,
+  writeFloatLE,
+  writeInt32BE,
+  writeInt32LE,
+  writeUInt32BE,
+  writeUInt32LE
 }
 
 
@@ -12671,6 +12498,218 @@ function range(a, b, str) {
   }
 
   return result;
+}
+
+
+/***/ }),
+
+/***/ 4691:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var balanced = __nccwpck_require__(9380);
+
+module.exports = expandTop;
+
+var escSlash = '\0SLASH'+Math.random()+'\0';
+var escOpen = '\0OPEN'+Math.random()+'\0';
+var escClose = '\0CLOSE'+Math.random()+'\0';
+var escComma = '\0COMMA'+Math.random()+'\0';
+var escPeriod = '\0PERIOD'+Math.random()+'\0';
+
+function numeric(str) {
+  return parseInt(str, 10) == str
+    ? parseInt(str, 10)
+    : str.charCodeAt(0);
+}
+
+function escapeBraces(str) {
+  return str.split('\\\\').join(escSlash)
+            .split('\\{').join(escOpen)
+            .split('\\}').join(escClose)
+            .split('\\,').join(escComma)
+            .split('\\.').join(escPeriod);
+}
+
+function unescapeBraces(str) {
+  return str.split(escSlash).join('\\')
+            .split(escOpen).join('{')
+            .split(escClose).join('}')
+            .split(escComma).join(',')
+            .split(escPeriod).join('.');
+}
+
+
+// Basically just str.split(","), but handling cases
+// where we have nested braced sections, which should be
+// treated as individual members, like {a,{b,c},d}
+function parseCommaParts(str) {
+  if (!str)
+    return [''];
+
+  var parts = [];
+  var m = balanced('{', '}', str);
+
+  if (!m)
+    return str.split(',');
+
+  var pre = m.pre;
+  var body = m.body;
+  var post = m.post;
+  var p = pre.split(',');
+
+  p[p.length-1] += '{' + body + '}';
+  var postParts = parseCommaParts(post);
+  if (post.length) {
+    p[p.length-1] += postParts.shift();
+    p.push.apply(p, postParts);
+  }
+
+  parts.push.apply(parts, p);
+
+  return parts;
+}
+
+function expandTop(str, options) {
+  if (!str)
+    return [];
+
+  options = options || {};
+  var max = options.max == null ? Infinity : options.max;
+
+  // I don't know why Bash 4.3 does this, but it does.
+  // Anything starting with {} will have the first two bytes preserved
+  // but *only* at the top level, so {},a}b will not expand to anything,
+  // but a{},b}c will be expanded to [a}c,abc].
+  // One could argue that this is a bug in Bash, but since the goal of
+  // this module is to match Bash's rules, we escape a leading {}
+  if (str.substr(0, 2) === '{}') {
+    str = '\\{\\}' + str.substr(2);
+  }
+
+  return expand(escapeBraces(str), max, true).map(unescapeBraces);
+}
+
+function embrace(str) {
+  return '{' + str + '}';
+}
+function isPadded(el) {
+  return /^-?0\d/.test(el);
+}
+
+function lte(i, y) {
+  return i <= y;
+}
+function gte(i, y) {
+  return i >= y;
+}
+
+function expand(str, max, isTop) {
+  var expansions = [];
+
+  var m = balanced('{', '}', str);
+  if (!m) return [str];
+
+  // no need to expand pre, since it is guaranteed to be free of brace-sets
+  var pre = m.pre;
+  var post = m.post.length
+    ? expand(m.post, max, false)
+    : [''];
+
+  if (/\$$/.test(m.pre)) {    
+    for (var k = 0; k < post.length && k < max; k++) {
+      var expansion = pre+ '{' + m.body + '}' + post[k];
+      expansions.push(expansion);
+    }
+  } else {
+    var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
+    var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
+    var isSequence = isNumericSequence || isAlphaSequence;
+    var isOptions = m.body.indexOf(',') >= 0;
+    if (!isSequence && !isOptions) {
+      // {a},b}
+      if (m.post.match(/,(?!,).*\}/)) {
+        str = m.pre + '{' + m.body + escClose + m.post;
+        return expand(str, max, true);
+      }
+      return [str];
+    }
+
+    var n;
+    if (isSequence) {
+      n = m.body.split(/\.\./);
+    } else {
+      n = parseCommaParts(m.body);
+      if (n.length === 1) {
+        // x{{a,b}}y ==> x{a}y x{b}y
+        n = expand(n[0], max, false).map(embrace);
+        if (n.length === 1) {
+          return post.map(function(p) {
+            return m.pre + n[0] + p;
+          });
+        }
+      }
+    }
+
+    // at this point, n is the parts, and we know it's not a comma set
+    // with a single entry.
+    var N;
+
+    if (isSequence) {
+      var x = numeric(n[0]);
+      var y = numeric(n[1]);
+      var width = Math.max(n[0].length, n[1].length)
+      var incr = n.length == 3
+        ? Math.max(Math.abs(numeric(n[2])), 1)
+        : 1;
+      var test = lte;
+      var reverse = y < x;
+      if (reverse) {
+        incr *= -1;
+        test = gte;
+      }
+      var pad = n.some(isPadded);
+
+      N = [];
+
+      for (var i = x; test(i, y) && N.length < max; i += incr) {
+        var c;
+        if (isAlphaSequence) {
+          c = String.fromCharCode(i);
+          if (c === '\\')
+            c = '';
+        } else {
+          c = String(i);
+          if (pad) {
+            var need = width - c.length;
+            if (need > 0) {
+              var z = new Array(need + 1).join('0');
+              if (i < 0)
+                c = '-' + z + c.slice(1);
+              else
+                c = z + c;
+            }
+          }
+        }
+        N.push(c);
+      }
+    } else {
+      N = [];
+
+      for (var j = 0; j < n.length; j++) {
+        N.push.apply(N, expand(n[j], max, false));
+      }
+    }
+
+    for (var j = 0; j < N.length; j++) {
+      for (var k = 0; k < post.length && expansions.length < max; k++) {
+        var expansion = pre + N[j] + post[k];
+        if (!isTop || isSequence || expansion)
+          expansions.push(expansion);
+      }
+    }
+  }
+
+  return expansions;
 }
 
 
@@ -14860,14 +14899,17 @@ function useColors() {
 		return false;
 	}
 
+	let m;
+
 	// Is webkit? http://stackoverflow.com/a/16459606/376773
 	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	// eslint-disable-next-line no-return-assign
 	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
 		// Is firebug? http://stackoverflow.com/a/398120/376773
 		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
 		// Is firefox >= v31?
 		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		(typeof navigator !== 'undefined' && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31) ||
 		// Double check webkit in userAgent just in case we are in a worker
 		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
 }
@@ -14951,7 +14993,7 @@ function save(namespaces) {
 function load() {
 	let r;
 	try {
-		r = exports.storage.getItem('debug');
+		r = exports.storage.getItem('debug') || exports.storage.getItem('DEBUG') ;
 	} catch (error) {
 		// Swallow
 		// XXX (@Qix-) should we be logging these?
@@ -15177,24 +15219,62 @@ function setup(env) {
 		createDebug.names = [];
 		createDebug.skips = [];
 
-		let i;
-		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-		const len = split.length;
+		const split = (typeof namespaces === 'string' ? namespaces : '')
+			.trim()
+			.replace(/\s+/g, ',')
+			.split(',')
+			.filter(Boolean);
 
-		for (i = 0; i < len; i++) {
-			if (!split[i]) {
-				// ignore empty strings
-				continue;
-			}
-
-			namespaces = split[i].replace(/\*/g, '.*?');
-
-			if (namespaces[0] === '-') {
-				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+		for (const ns of split) {
+			if (ns[0] === '-') {
+				createDebug.skips.push(ns.slice(1));
 			} else {
-				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+				createDebug.names.push(ns);
 			}
 		}
+	}
+
+	/**
+	 * Checks if the given string matches a namespace template, honoring
+	 * asterisks as wildcards.
+	 *
+	 * @param {String} search
+	 * @param {String} template
+	 * @return {Boolean}
+	 */
+	function matchesTemplate(search, template) {
+		let searchIndex = 0;
+		let templateIndex = 0;
+		let starIndex = -1;
+		let matchIndex = 0;
+
+		while (searchIndex < search.length) {
+			if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === '*')) {
+				// Match character or proceed with wildcard
+				if (template[templateIndex] === '*') {
+					starIndex = templateIndex;
+					matchIndex = searchIndex;
+					templateIndex++; // Skip the '*'
+				} else {
+					searchIndex++;
+					templateIndex++;
+				}
+			} else if (starIndex !== -1) { // eslint-disable-line no-negated-condition
+				// Backtrack to the last '*' and try to match more characters
+				templateIndex = starIndex + 1;
+				matchIndex++;
+				searchIndex = matchIndex;
+			} else {
+				return false; // No match
+			}
+		}
+
+		// Handle trailing '*' in template
+		while (templateIndex < template.length && template[templateIndex] === '*') {
+			templateIndex++;
+		}
+
+		return templateIndex === template.length;
 	}
 
 	/**
@@ -15205,8 +15285,8 @@ function setup(env) {
 	*/
 	function disable() {
 		const namespaces = [
-			...createDebug.names.map(toNamespace),
-			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+			...createDebug.names,
+			...createDebug.skips.map(namespace => '-' + namespace)
 		].join(',');
 		createDebug.enable('');
 		return namespaces;
@@ -15220,39 +15300,19 @@ function setup(env) {
 	* @api public
 	*/
 	function enabled(name) {
-		if (name[name.length - 1] === '*') {
-			return true;
-		}
-
-		let i;
-		let len;
-
-		for (i = 0, len = createDebug.skips.length; i < len; i++) {
-			if (createDebug.skips[i].test(name)) {
+		for (const skip of createDebug.skips) {
+			if (matchesTemplate(name, skip)) {
 				return false;
 			}
 		}
 
-		for (i = 0, len = createDebug.names.length; i < len; i++) {
-			if (createDebug.names[i].test(name)) {
+		for (const ns of createDebug.names) {
+			if (matchesTemplate(name, ns)) {
 				return true;
 			}
 		}
 
 		return false;
-	}
-
-	/**
-	* Convert regexp to namespace
-	*
-	* @param {RegExp} regxep
-	* @return {String} namespace
-	* @api private
-	*/
-	function toNamespace(regexp) {
-		return regexp.toString()
-			.substring(2, regexp.toString().length - 2)
-			.replace(/\.\*\?$/, '*');
 	}
 
 	/**
@@ -15496,11 +15556,11 @@ function getDate() {
 }
 
 /**
- * Invokes `util.format()` with the specified arguments and writes to stderr.
+ * Invokes `util.formatWithOptions()` with the specified arguments and writes to stderr.
  */
 
 function log(...args) {
-	return process.stderr.write(util.format(...args) + '\n');
+	return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + '\n');
 }
 
 /**
@@ -16762,6 +16822,14 @@ module.exports = EventTarget
 module.exports.EventTarget = module.exports["default"] = EventTarget
 module.exports.defineEventAttribute = defineEventAttribute
 //# sourceMappingURL=event-target-shim.js.map
+
+
+/***/ }),
+
+/***/ 9580:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = __nccwpck_require__(4434)
 
 
 /***/ }),
@@ -18249,7 +18317,7 @@ var $TypeError = __nccwpck_require__(3314);
 var $URIError = __nccwpck_require__(2578);
 
 var abs = __nccwpck_require__(5641);
-var floor = __nccwpck_require__(8552);
+var floor = __nccwpck_require__(6171);
 var max = __nccwpck_require__(7147);
 var min = __nccwpck_require__(1017);
 var pow = __nccwpck_require__(6947);
@@ -26014,7 +26082,7 @@ module.exports = Math.abs;
 
 /***/ }),
 
-/***/ 8552:
+/***/ 6171:
 /***/ ((module) => {
 
 "use strict";
@@ -26350,7 +26418,7 @@ var y = d * 365.25;
  * @api public
  */
 
-module.exports = function(val, options) {
+module.exports = function (val, options) {
   options = options || {};
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
@@ -26591,24 +26659,6 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 // for now just expose the builtin process global from node.js
 module.exports = global.process;
-
-
-/***/ }),
-
-/***/ 3125:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-module.exports = (typeof process !== 'undefined' && typeof process.nextTick === 'function')
-  ? process.nextTick.bind(process)
-  : __nccwpck_require__(6828)
-
-
-/***/ }),
-
-/***/ 6828:
-/***/ ((module) => {
-
-module.exports = typeof queueMicrotask === 'function' ? queueMicrotask : (fn) => Promise.resolve().then(fn)
 
 
 /***/ }),
@@ -27877,15 +27927,18 @@ function _duplexify(pair) {
 /***/ 6815:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+"use strict";
+// Ported from https://github.com/mafintosh/end-of-stream with
+// permission from the author, Mathias Buus (@mafintosh).
+
+
+
 /* replacement start */
 
 const process = __nccwpck_require__(7945)
 
 /* replacement end */
-// Ported from https://github.com/mafintosh/end-of-stream with
-// permission from the author, Mathias Buus (@mafintosh).
 
-;('use strict')
 const { AbortError, codes } = __nccwpck_require__(9220)
 const { ERR_INVALID_ARG_TYPE, ERR_STREAM_PREMATURE_CLOSE } = codes
 const { kEmptyObject, once } = __nccwpck_require__(3539)
@@ -29361,11 +29414,7 @@ module.exports = {
 /***/ 7783:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-/* replacement start */
-
-const process = __nccwpck_require__(7945)
-
-/* replacement end */
+"use strict";
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -29387,7 +29436,14 @@ const process = __nccwpck_require__(7945)
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-;('use strict')
+
+
+/* replacement start */
+
+const process = __nccwpck_require__(7945)
+
+/* replacement end */
+
 const {
   ArrayPrototypeIndexOf,
   NumberIsInteger,
@@ -29428,7 +29484,7 @@ const {
 } = __nccwpck_require__(9220)
 const { validateObject } = __nccwpck_require__(9554)
 const kPaused = Symbol('kPaused')
-const { StringDecoder } = __nccwpck_require__(3193)
+const { StringDecoder } = __nccwpck_require__(634)
 const from = __nccwpck_require__(4659)
 ObjectSetPrototypeOf(Readable.prototype, Stream.prototype)
 ObjectSetPrototypeOf(Readable, Stream)
@@ -30924,7 +30980,6 @@ function isReadableNodeStream(obj, strict = false) {
     ) // Writable has .pipe.
   )
 }
-
 function isWritableNodeStream(obj) {
   var _obj$_writableState
   return !!(
@@ -30939,7 +30994,6 @@ function isWritableNodeStream(obj) {
     ) // Duplex
   )
 }
-
 function isDuplexNodeStream(obj) {
   return !!(
     obj &&
@@ -31228,11 +31282,7 @@ module.exports = {
 /***/ 8939:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-/* replacement start */
-
-const process = __nccwpck_require__(7945)
-
-/* replacement end */
+"use strict";
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -31258,7 +31308,14 @@ const process = __nccwpck_require__(7945)
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
 // the drain event emission and buffering.
 
-;('use strict')
+
+
+/* replacement start */
+
+const process = __nccwpck_require__(7945)
+
+/* replacement end */
+
 const {
   ArrayPrototypeSlice,
   Error,
@@ -32593,12 +32650,13 @@ module.exports = {
 "use strict";
 
 
-const { format, inspect, AggregateError: CustomAggregateError } = __nccwpck_require__(3539)
+const { format, inspect } = __nccwpck_require__(3536)
+const { AggregateError: CustomAggregateError } = __nccwpck_require__(999)
 
 /*
   This file is a reduced and adapted version of the main lib/internal/errors.js file defined at
 
-  https://github.com/nodejs/node/blob/master/lib/internal/errors.js
+  https://github.com/nodejs/node/blob/main/lib/internal/errors.js
 
   Don't try to replace with the original file and keep it up to date (starting from E(...) definitions)
   with the upstream file.
@@ -32904,7 +32962,8 @@ E(
       received = addNumericalSeparator(String(input))
     } else if (typeof input === 'bigint') {
       received = String(input)
-      if (input > 2n ** 32n || input < -(2n ** 32n)) {
+      const limit = BigInt(2) ** BigInt(32)
+      if (input > limit || input < -limit) {
         received = addNumericalSeparator(received)
       }
       received += 'n'
@@ -33018,11 +33077,28 @@ module.exports["default"] = module.exports
 /*
   This file is a reduced and adapted version of the main lib/internal/per_context/primordials.js file defined at
 
-  https://github.com/nodejs/node/blob/master/lib/internal/per_context/primordials.js
+  https://github.com/nodejs/node/blob/main/lib/internal/per_context/primordials.js
 
   Don't try to replace with the original file and keep it up to date with the upstream file.
 */
+
+// This is a simplified version of AggregateError
+class AggregateError extends Error {
+  constructor(errors) {
+    if (!Array.isArray(errors)) {
+      throw new TypeError(`Expected input to be an Array, got ${typeof errors}`)
+    }
+    let message = ''
+    for (let i = 0; i < errors.length; i++) {
+      message += `    ${errors[i].stack}\n`
+    }
+    super(message)
+    this.name = 'AggregateError'
+    this.errors = errors
+  }
+}
 module.exports = {
+  AggregateError,
   ArrayIsArray(self) {
     return Array.isArray(self)
   },
@@ -33117,7 +33193,7 @@ module.exports = {
   TypedArrayPrototypeSet(self, buf, len) {
     return self.set(buf, len)
   },
-  Boolean: Boolean,
+  Boolean,
   Uint8Array
 }
 
@@ -33131,7 +33207,11 @@ module.exports = {
 
 
 const bufferModule = __nccwpck_require__(181)
-const { kResistStopPropagation, SymbolDispose } = __nccwpck_require__(999)
+const { format, inspect } = __nccwpck_require__(3536)
+const {
+  codes: { ERR_INVALID_ARG_TYPE }
+} = __nccwpck_require__(9220)
+const { kResistStopPropagation, AggregateError, SymbolDispose } = __nccwpck_require__(999)
 const AbortSignal = globalThis.AbortSignal || (__nccwpck_require__(7413).AbortSignal)
 const AbortController = globalThis.AbortController || (__nccwpck_require__(7413).AbortController)
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
@@ -33154,22 +33234,8 @@ const validateAbortSignal = (signal, name) => {
   }
 }
 const validateFunction = (value, name) => {
-  if (typeof value !== 'function') throw new ERR_INVALID_ARG_TYPE(name, 'Function', value)
-}
-
-// This is a simplified version of AggregateError
-class AggregateError extends Error {
-  constructor(errors) {
-    if (!Array.isArray(errors)) {
-      throw new TypeError(`Expected input to be an Array, got ${typeof errors}`)
-    }
-    let message = ''
-    for (let i = 0; i < errors.length; i++) {
-      message += `    ${errors[i].stack}\n`
-    }
-    super(message)
-    this.name = 'AggregateError'
-    this.errors = errors
+  if (typeof value !== 'function') {
+    throw new ERR_INVALID_ARG_TYPE(name, 'Function', value)
   }
 }
 module.exports = {
@@ -33213,50 +33279,8 @@ module.exports = {
   debuglog() {
     return function () {}
   },
-  format(format, ...args) {
-    // Simplified version of https://nodejs.org/api/util.html#utilformatformat-args
-    return format.replace(/%([sdifj])/g, function (...[_unused, type]) {
-      const replacement = args.shift()
-      if (type === 'f') {
-        return replacement.toFixed(6)
-      } else if (type === 'j') {
-        return JSON.stringify(replacement)
-      } else if (type === 's' && typeof replacement === 'object') {
-        const ctor = replacement.constructor !== Object ? replacement.constructor.name : ''
-        return `${ctor} {}`.trim()
-      } else {
-        return replacement.toString()
-      }
-    })
-  },
-  inspect(value) {
-    // Vastly simplified version of https://nodejs.org/api/util.html#utilinspectobject-options
-    switch (typeof value) {
-      case 'string':
-        if (value.includes("'")) {
-          if (!value.includes('"')) {
-            return `"${value}"`
-          } else if (!value.includes('`') && !value.includes('${')) {
-            return `\`${value}\``
-          }
-        }
-        return `'${value}'`
-      case 'number':
-        if (isNaN(value)) {
-          return 'NaN'
-        } else if (Object.is(value, -0)) {
-          return String(value)
-        }
-        return value
-      case 'bigint':
-        return `${String(value)}n`
-      case 'boolean':
-      case 'undefined':
-        return String(value)
-      case 'object':
-        return '{}'
-    }
-  },
+  format,
+  inspect,
   types: {
     isAsyncFunction(fn) {
       return fn instanceof AsyncFunction
@@ -33332,14 +33356,73 @@ module.exports.promisify.custom = Symbol.for('nodejs.util.promisify.custom')
 
 /***/ }),
 
+/***/ 3536:
+/***/ ((module) => {
+
+"use strict";
+
+
+/*
+  This file is a reduced and adapted version of the main lib/internal/util/inspect.js file defined at
+
+  https://github.com/nodejs/node/blob/main/lib/internal/util/inspect.js
+
+  Don't try to replace with the original file and keep it up to date with the upstream file.
+*/
+module.exports = {
+  format(format, ...args) {
+    // Simplified version of https://nodejs.org/api/util.html#utilformatformat-args
+    return format.replace(/%([sdifj])/g, function (...[_unused, type]) {
+      const replacement = args.shift()
+      if (type === 'f') {
+        return replacement.toFixed(6)
+      } else if (type === 'j') {
+        return JSON.stringify(replacement)
+      } else if (type === 's' && typeof replacement === 'object') {
+        const ctor = replacement.constructor !== Object ? replacement.constructor.name : ''
+        return `${ctor} {}`.trim()
+      } else {
+        return replacement.toString()
+      }
+    })
+  },
+  inspect(value) {
+    // Vastly simplified version of https://nodejs.org/api/util.html#utilinspectobject-options
+    switch (typeof value) {
+      case 'string':
+        if (value.includes("'")) {
+          if (!value.includes('"')) {
+            return `"${value}"`
+          } else if (!value.includes('`') && !value.includes('${')) {
+            return `\`${value}\``
+          }
+        }
+        return `'${value}'`
+      case 'number':
+        if (isNaN(value)) {
+          return 'NaN'
+        } else if (Object.is(value, -0)) {
+          return String(value)
+        }
+        return value
+      case 'bigint':
+        return `${String(value)}n`
+      case 'boolean':
+      case 'undefined':
+        return String(value)
+      case 'object':
+        return '{}'
+    }
+  }
+}
+
+
+/***/ }),
+
 /***/ 2375:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-/* replacement start */
-
-const { Buffer } = __nccwpck_require__(181)
-
-/* replacement end */
+"use strict";
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -33361,7 +33444,14 @@ const { Buffer } = __nccwpck_require__(181)
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-;('use strict')
+
+
+/* replacement start */
+
+const { Buffer } = __nccwpck_require__(181)
+
+/* replacement end */
+
 const { ObjectDefineProperty, ObjectKeys, ReflectApply } = __nccwpck_require__(999)
 const {
   promisify: { custom: customPromisify }
@@ -33780,218 +33870,6 @@ readdirGlob.ReaddirGlob = ReaddirGlob;
 
 /***/ }),
 
-/***/ 3967:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var balanced = __nccwpck_require__(9380);
-
-module.exports = expandTop;
-
-var escSlash = '\0SLASH'+Math.random()+'\0';
-var escOpen = '\0OPEN'+Math.random()+'\0';
-var escClose = '\0CLOSE'+Math.random()+'\0';
-var escComma = '\0COMMA'+Math.random()+'\0';
-var escPeriod = '\0PERIOD'+Math.random()+'\0';
-
-function numeric(str) {
-  return parseInt(str, 10) == str
-    ? parseInt(str, 10)
-    : str.charCodeAt(0);
-}
-
-function escapeBraces(str) {
-  return str.split('\\\\').join(escSlash)
-            .split('\\{').join(escOpen)
-            .split('\\}').join(escClose)
-            .split('\\,').join(escComma)
-            .split('\\.').join(escPeriod);
-}
-
-function unescapeBraces(str) {
-  return str.split(escSlash).join('\\')
-            .split(escOpen).join('{')
-            .split(escClose).join('}')
-            .split(escComma).join(',')
-            .split(escPeriod).join('.');
-}
-
-
-// Basically just str.split(","), but handling cases
-// where we have nested braced sections, which should be
-// treated as individual members, like {a,{b,c},d}
-function parseCommaParts(str) {
-  if (!str)
-    return [''];
-
-  var parts = [];
-  var m = balanced('{', '}', str);
-
-  if (!m)
-    return str.split(',');
-
-  var pre = m.pre;
-  var body = m.body;
-  var post = m.post;
-  var p = pre.split(',');
-
-  p[p.length-1] += '{' + body + '}';
-  var postParts = parseCommaParts(post);
-  if (post.length) {
-    p[p.length-1] += postParts.shift();
-    p.push.apply(p, postParts);
-  }
-
-  parts.push.apply(parts, p);
-
-  return parts;
-}
-
-function expandTop(str, options) {
-  if (!str)
-    return [];
-
-  options = options || {};
-  var max = options.max == null ? Infinity : options.max;
-
-  // I don't know why Bash 4.3 does this, but it does.
-  // Anything starting with {} will have the first two bytes preserved
-  // but *only* at the top level, so {},a}b will not expand to anything,
-  // but a{},b}c will be expanded to [a}c,abc].
-  // One could argue that this is a bug in Bash, but since the goal of
-  // this module is to match Bash's rules, we escape a leading {}
-  if (str.substr(0, 2) === '{}') {
-    str = '\\{\\}' + str.substr(2);
-  }
-
-  return expand(escapeBraces(str), max, true).map(unescapeBraces);
-}
-
-function embrace(str) {
-  return '{' + str + '}';
-}
-function isPadded(el) {
-  return /^-?0\d/.test(el);
-}
-
-function lte(i, y) {
-  return i <= y;
-}
-function gte(i, y) {
-  return i >= y;
-}
-
-function expand(str, max, isTop) {
-  var expansions = [];
-
-  var m = balanced('{', '}', str);
-  if (!m) return [str];
-
-  // no need to expand pre, since it is guaranteed to be free of brace-sets
-  var pre = m.pre;
-  var post = m.post.length
-    ? expand(m.post, max, false)
-    : [''];
-
-  if (/\$$/.test(m.pre)) {    
-    for (var k = 0; k < post.length && k < max; k++) {
-      var expansion = pre+ '{' + m.body + '}' + post[k];
-      expansions.push(expansion);
-    }
-  } else {
-    var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
-    var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
-    var isSequence = isNumericSequence || isAlphaSequence;
-    var isOptions = m.body.indexOf(',') >= 0;
-    if (!isSequence && !isOptions) {
-      // {a},b}
-      if (m.post.match(/,(?!,).*\}/)) {
-        str = m.pre + '{' + m.body + escClose + m.post;
-        return expand(str, max, true);
-      }
-      return [str];
-    }
-
-    var n;
-    if (isSequence) {
-      n = m.body.split(/\.\./);
-    } else {
-      n = parseCommaParts(m.body);
-      if (n.length === 1) {
-        // x{{a,b}}y ==> x{a}y x{b}y
-        n = expand(n[0], max, false).map(embrace);
-        if (n.length === 1) {
-          return post.map(function(p) {
-            return m.pre + n[0] + p;
-          });
-        }
-      }
-    }
-
-    // at this point, n is the parts, and we know it's not a comma set
-    // with a single entry.
-    var N;
-
-    if (isSequence) {
-      var x = numeric(n[0]);
-      var y = numeric(n[1]);
-      var width = Math.max(n[0].length, n[1].length)
-      var incr = n.length == 3
-        ? Math.max(Math.abs(numeric(n[2])), 1)
-        : 1;
-      var test = lte;
-      var reverse = y < x;
-      if (reverse) {
-        incr *= -1;
-        test = gte;
-      }
-      var pad = n.some(isPadded);
-
-      N = [];
-
-      for (var i = x; test(i, y) && N.length < max; i += incr) {
-        var c;
-        if (isAlphaSequence) {
-          c = String.fromCharCode(i);
-          if (c === '\\')
-            c = '';
-        } else {
-          c = String(i);
-          if (pad) {
-            var need = width - c.length;
-            if (need > 0) {
-              var z = new Array(need + 1).join('0');
-              if (i < 0)
-                c = '-' + z + c.slice(1);
-              else
-                c = z + c;
-            }
-          }
-        }
-        N.push(c);
-      }
-    } else {
-      N = [];
-
-      for (var j = 0; j < n.length; j++) {
-        N.push.apply(N, expand(n[j], max, false));
-      }
-    }
-
-    for (var j = 0; j < N.length; j++) {
-      for (var k = 0; k < post.length && expansions.length < max; k++) {
-        var expansion = pre + N[j] + post[k];
-        if (!isTop || isSequence || expansion)
-          expansions.push(expansion);
-      }
-    }
-  }
-
-  return expansions;
-}
-
-
-/***/ }),
-
 /***/ 3669:
 /***/ ((module) => {
 
@@ -34024,7 +33902,7 @@ minimatch.sep = path.sep
 
 const GLOBSTAR = Symbol('globstar **')
 minimatch.GLOBSTAR = GLOBSTAR
-const expand = __nccwpck_require__(3967)
+const expand = __nccwpck_require__(4691)
 
 const plTypes = {
   '!': { open: '(?:(?!(?:', close: '))[^/]*?)'},
@@ -35006,11 +34884,86 @@ minimatch.Minimatch = Minimatch
 
 /***/ }),
 
+/***/ 3058:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+/*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
+/* eslint-disable node/no-deprecated-api */
+var buffer = __nccwpck_require__(181)
+var Buffer = buffer.Buffer
+
+// alternative to using Object.keys for old browsers
+function copyProps (src, dst) {
+  for (var key in src) {
+    dst[key] = src[key]
+  }
+}
+if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
+  module.exports = buffer
+} else {
+  // Copy properties from require('buffer')
+  copyProps(buffer, exports)
+  exports.Buffer = SafeBuffer
+}
+
+function SafeBuffer (arg, encodingOrOffset, length) {
+  return Buffer(arg, encodingOrOffset, length)
+}
+
+SafeBuffer.prototype = Object.create(Buffer.prototype)
+
+// Copy static methods from Buffer
+copyProps(Buffer, SafeBuffer)
+
+SafeBuffer.from = function (arg, encodingOrOffset, length) {
+  if (typeof arg === 'number') {
+    throw new TypeError('Argument must not be a number')
+  }
+  return Buffer(arg, encodingOrOffset, length)
+}
+
+SafeBuffer.alloc = function (size, fill, encoding) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  var buf = Buffer(size)
+  if (fill !== undefined) {
+    if (typeof encoding === 'string') {
+      buf.fill(fill, encoding)
+    } else {
+      buf.fill(fill)
+    }
+  } else {
+    buf.fill(0)
+  }
+  return buf
+}
+
+SafeBuffer.allocUnsafe = function (size) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  return Buffer(size)
+}
+
+SafeBuffer.allocUnsafeSlow = function (size) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  return buffer.SlowBuffer(size)
+}
+
+
+/***/ }),
+
 /***/ 2560:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
-;(function (sax) { // wrapper for non-node envs
-  sax.parser = function (strict, opt) { return new SAXParser(strict, opt) }
+;(function (sax) {
+  // wrapper for non-node envs
+  sax.parser = function (strict, opt) {
+    return new SAXParser(strict, opt)
+  }
   sax.SAXParser = SAXParser
   sax.SAXStream = SAXStream
   sax.createStream = createStream
@@ -35027,9 +34980,18 @@ minimatch.Minimatch = Minimatch
   sax.MAX_BUFFER_LENGTH = 64 * 1024
 
   var buffers = [
-    'comment', 'sgmlDecl', 'textNode', 'tagName', 'doctype',
-    'procInstName', 'procInstBody', 'entity', 'attribName',
-    'attribValue', 'cdata', 'script'
+    'comment',
+    'sgmlDecl',
+    'textNode',
+    'tagName',
+    'doctype',
+    'procInstName',
+    'procInstBody',
+    'entity',
+    'attribName',
+    'attribValue',
+    'cdata',
+    'script',
   ]
 
   sax.EVENTS = [
@@ -35050,10 +35012,10 @@ minimatch.Minimatch = Minimatch
     'ready',
     'script',
     'opennamespace',
-    'closenamespace'
+    'closenamespace',
   ]
 
-  function SAXParser (strict, opt) {
+  function SAXParser(strict, opt) {
     if (!(this instanceof SAXParser)) {
       return new SAXParser(strict, opt)
     }
@@ -35062,9 +35024,13 @@ minimatch.Minimatch = Minimatch
     clearBuffers(parser)
     parser.q = parser.c = ''
     parser.bufferCheckPosition = sax.MAX_BUFFER_LENGTH
+    parser.encoding = null;
     parser.opt = opt || {}
     parser.opt.lowercase = parser.opt.lowercase || parser.opt.lowercasetags
     parser.looseCase = parser.opt.lowercase ? 'toLowerCase' : 'toUpperCase'
+    parser.opt.maxEntityCount = parser.opt.maxEntityCount || 512
+    parser.opt.maxEntityDepth = parser.opt.maxEntityDepth || 4
+    parser.entityCount = parser.entityDepth = 0
     parser.tags = []
     parser.closed = parser.closedRoot = parser.sawRoot = false
     parser.tag = parser.error = null
@@ -35072,7 +35038,10 @@ minimatch.Minimatch = Minimatch
     parser.noscript = !!(strict || parser.opt.noscript)
     parser.state = S.BEGIN
     parser.strictEntities = parser.opt.strictEntities
-    parser.ENTITIES = parser.strictEntities ? Object.create(sax.XML_ENTITIES) : Object.create(sax.ENTITIES)
+    parser.ENTITIES =
+      parser.strictEntities ?
+        Object.create(sax.XML_ENTITIES)
+      : Object.create(sax.ENTITIES)
     parser.attribList = []
 
     // namespaces form a prototype chain.
@@ -35080,6 +35049,12 @@ minimatch.Minimatch = Minimatch
     // which protos to its parent tag.
     if (parser.opt.xmlns) {
       parser.ns = Object.create(rootNS)
+    }
+
+    // disallow unquoted attribute values if not otherwise configured
+    // and strict mode is true
+    if (parser.opt.unquotedAttributeValues === undefined) {
+      parser.opt.unquotedAttributeValues = !strict
     }
 
     // mostly just for error reporting
@@ -35092,7 +35067,7 @@ minimatch.Minimatch = Minimatch
 
   if (!Object.create) {
     Object.create = function (o) {
-      function F () {}
+      function F() {}
       F.prototype = o
       var newf = new F()
       return newf
@@ -35107,7 +35082,7 @@ minimatch.Minimatch = Minimatch
     }
   }
 
-  function checkBufferLength (parser) {
+  function checkBufferLength(parser) {
     var maxAllowed = Math.max(sax.MAX_BUFFER_LENGTH, 10)
     var maxActual = 0
     for (var i = 0, l = buffers.length; i < l; i++) {
@@ -35143,13 +35118,13 @@ minimatch.Minimatch = Minimatch
     parser.bufferCheckPosition = m + parser.position
   }
 
-  function clearBuffers (parser) {
+  function clearBuffers(parser) {
     for (var i = 0, l = buffers.length; i < l; i++) {
       parser[buffers[i]] = ''
     }
   }
 
-  function flushBuffers (parser) {
+  function flushBuffers(parser) {
     closeText(parser)
     if (parser.cdata !== '') {
       emitNode(parser, 'oncdata', parser.cdata)
@@ -35162,11 +35137,20 @@ minimatch.Minimatch = Minimatch
   }
 
   SAXParser.prototype = {
-    end: function () { end(this) },
+    end: function () {
+      end(this)
+    },
     write: write,
-    resume: function () { this.error = null; return this },
-    close: function () { return this.write(null) },
-    flush: function () { flushBuffers(this) }
+    resume: function () {
+      this.error = null
+      return this
+    },
+    close: function () {
+      return this.write(null)
+    },
+    flush: function () {
+      flushBuffers(this)
+    },
   }
 
   var Stream
@@ -35181,11 +35165,44 @@ minimatch.Minimatch = Minimatch
     return ev !== 'error' && ev !== 'end'
   })
 
-  function createStream (strict, opt) {
+  function createStream(strict, opt) {
     return new SAXStream(strict, opt)
   }
 
-  function SAXStream (strict, opt) {
+  function determineBufferEncoding(data, isEnd) {
+    // BOM-based detection is the most reliable signal when present.
+    if (data.length >= 2) {
+      if (data[0] === 0xff && data[1] === 0xfe) {
+        return 'utf-16le'
+      }
+
+      if (data[0] === 0xfe && data[1] === 0xff) {
+        return 'utf-16be'
+      }
+    }
+
+    if (data.length >= 3 && data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf) {
+      return 'utf8'
+    }
+
+    if (data.length >= 4) {
+      // XML documents without a BOM still start with "<?xml", which is enough
+      // to distinguish UTF-16LE/BE from UTF-8 by looking at the zero bytes.
+      if (data[0] === 0x3c && data[1] === 0x00 && data[2] === 0x3f && data[3] === 0x00) {
+        return 'utf-16le'
+      }
+
+      if (data[0] === 0x00 && data[1] === 0x3c && data[2] === 0x00 && data[3] === 0x3f) {
+        return 'utf-16be'
+      }
+
+      return 'utf8'
+    }
+
+    return isEnd ? 'utf8' : null
+  }
+
+  function SAXStream(strict, opt) {
     if (!(this instanceof SAXStream)) {
       return new SAXStream(strict, opt)
     }
@@ -35211,7 +35228,7 @@ minimatch.Minimatch = Minimatch
     }
 
     this._decoder = null
-
+    this._decoderBuffer = null
     streamWraps.forEach(function (ev) {
       Object.defineProperty(me, 'on' + ev, {
         get: function () {
@@ -35226,26 +35243,58 @@ minimatch.Minimatch = Minimatch
           me.on(ev, h)
         },
         enumerable: true,
-        configurable: false
+        configurable: false,
       })
     })
   }
 
   SAXStream.prototype = Object.create(Stream.prototype, {
     constructor: {
-      value: SAXStream
-    }
+      value: SAXStream,
+    },
   })
 
-  SAXStream.prototype.write = function (data) {
-    if (typeof Buffer === 'function' &&
-      typeof Buffer.isBuffer === 'function' &&
-      Buffer.isBuffer(data)) {
-      if (!this._decoder) {
-        var SD = (__nccwpck_require__(3193).StringDecoder)
-        this._decoder = new SD('utf8')
+  SAXStream.prototype._decodeBuffer = function (data, isEnd) {
+    if (this._decoderBuffer) {
+      // Keep incomplete leading bytes until we have enough data to infer the
+      // stream encoding, then decode the buffered prefix together with the next chunk.
+      data = Buffer.concat([this._decoderBuffer, data])
+      this._decoderBuffer = null
+    }
+
+    if (!this._decoder) {
+      var encoding = determineBufferEncoding(data, isEnd)
+      if (!encoding) {
+        // A very short first chunk may not contain enough bytes to detect the
+        // encoding yet, so defer decoding until the next write/end call.
+        this._decoderBuffer = data
+        return ''
       }
-      data = this._decoder.write(data)
+
+      // Store the detected transport encoding so strict mode can compare it
+      // with the optional encoding declared in the XML prolog later on.
+      this._parser.encoding = encoding
+      this._decoder = new TextDecoder(encoding)
+    }
+
+    return this._decoder.decode(data, { stream: !isEnd })
+  }
+
+  SAXStream.prototype.write = function (data) {
+    if (
+      typeof Buffer === 'function' &&
+      typeof Buffer.isBuffer === 'function' &&
+      Buffer.isBuffer(data)
+    ) {
+      data = this._decodeBuffer(data, false)
+    } else if (this._decoderBuffer) {
+      // Flush any buffered binary prefix before handling a string chunk.
+      // This only matters if the caller mixes Buffer and string writes (used in test).
+      var remaining = this._decodeBuffer(Buffer.alloc(0), true)
+      if (remaining) {
+        this._parser.write(remaining)
+        this.emit('data', remaining)
+      }
     }
 
     this._parser.write(data.toString())
@@ -35257,6 +35306,20 @@ minimatch.Minimatch = Minimatch
     if (chunk && chunk.length) {
       this.write(chunk)
     }
+    // Flush any remaining decoded data from the TextDecoder
+    if (this._decoderBuffer) {
+      var finalChunk = this._decodeBuffer(Buffer.alloc(0), true)
+      if (finalChunk) {
+        this._parser.write(finalChunk)
+        this.emit('data', finalChunk)
+      }
+    } else if (this._decoder) {
+      var remaining = this._decoder.decode()
+      if (remaining) {
+        this._parser.write(remaining)
+        this.emit('data', remaining)
+      }
+    }
     this._parser.end()
     return true
   }
@@ -35265,7 +35328,10 @@ minimatch.Minimatch = Minimatch
     var me = this
     if (!me._parser['on' + ev] && streamWraps.indexOf(ev) !== -1) {
       me._parser['on' + ev] = function () {
-        var args = arguments.length === 1 ? [arguments[0]] : Array.apply(null, arguments)
+        var args =
+          arguments.length === 1 ?
+            [arguments[0]]
+          : Array.apply(null, arguments)
         args.splice(0, 0, ev)
         me.emit.apply(me, args)
       }
@@ -35288,30 +35354,34 @@ minimatch.Minimatch = Minimatch
   // without a significant breaking change to either this  parser, or the
   // JavaScript language.  Implementation of an emoji-capable xml parser
   // is left as an exercise for the reader.
-  var nameStart = /[:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]/
+  var nameStart =
+    /[:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]/
 
-  var nameBody = /[:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u00B7\u0300-\u036F\u203F-\u2040.\d-]/
+  var nameBody =
+    /[:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u00B7\u0300-\u036F\u203F-\u2040.\d-]/
 
-  var entityStart = /[#:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]/
-  var entityBody = /[#:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u00B7\u0300-\u036F\u203F-\u2040.\d-]/
+  var entityStart =
+    /[#:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]/
+  var entityBody =
+    /[#:_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u00B7\u0300-\u036F\u203F-\u2040.\d-]/
 
-  function isWhitespace (c) {
+  function isWhitespace(c) {
     return c === ' ' || c === '\n' || c === '\r' || c === '\t'
   }
 
-  function isQuote (c) {
-    return c === '"' || c === '\''
+  function isQuote(c) {
+    return c === '"' || c === "'"
   }
 
-  function isAttribEnd (c) {
+  function isAttribEnd(c) {
     return c === '>' || isWhitespace(c)
   }
 
-  function isMatch (regex, c) {
+  function isMatch(regex, c) {
     return regex.test(c)
   }
 
-  function notMatch (regex, c) {
+  function notMatch(regex, c) {
     return !isMatch(regex, c)
   }
 
@@ -35352,271 +35422,271 @@ minimatch.Minimatch = Minimatch
     CLOSE_TAG: S++, // </a
     CLOSE_TAG_SAW_WHITE: S++, // </a   >
     SCRIPT: S++, // <script> ...
-    SCRIPT_ENDING: S++ // <script> ... <
+    SCRIPT_ENDING: S++, // <script> ... <
   }
 
   sax.XML_ENTITIES = {
-    'amp': '&',
-    'gt': '>',
-    'lt': '<',
-    'quot': '"',
-    'apos': "'"
+    amp: '&',
+    gt: '>',
+    lt: '<',
+    quot: '"',
+    apos: "'",
   }
 
   sax.ENTITIES = {
-    'amp': '&',
-    'gt': '>',
-    'lt': '<',
-    'quot': '"',
-    'apos': "'",
-    'AElig': 198,
-    'Aacute': 193,
-    'Acirc': 194,
-    'Agrave': 192,
-    'Aring': 197,
-    'Atilde': 195,
-    'Auml': 196,
-    'Ccedil': 199,
-    'ETH': 208,
-    'Eacute': 201,
-    'Ecirc': 202,
-    'Egrave': 200,
-    'Euml': 203,
-    'Iacute': 205,
-    'Icirc': 206,
-    'Igrave': 204,
-    'Iuml': 207,
-    'Ntilde': 209,
-    'Oacute': 211,
-    'Ocirc': 212,
-    'Ograve': 210,
-    'Oslash': 216,
-    'Otilde': 213,
-    'Ouml': 214,
-    'THORN': 222,
-    'Uacute': 218,
-    'Ucirc': 219,
-    'Ugrave': 217,
-    'Uuml': 220,
-    'Yacute': 221,
-    'aacute': 225,
-    'acirc': 226,
-    'aelig': 230,
-    'agrave': 224,
-    'aring': 229,
-    'atilde': 227,
-    'auml': 228,
-    'ccedil': 231,
-    'eacute': 233,
-    'ecirc': 234,
-    'egrave': 232,
-    'eth': 240,
-    'euml': 235,
-    'iacute': 237,
-    'icirc': 238,
-    'igrave': 236,
-    'iuml': 239,
-    'ntilde': 241,
-    'oacute': 243,
-    'ocirc': 244,
-    'ograve': 242,
-    'oslash': 248,
-    'otilde': 245,
-    'ouml': 246,
-    'szlig': 223,
-    'thorn': 254,
-    'uacute': 250,
-    'ucirc': 251,
-    'ugrave': 249,
-    'uuml': 252,
-    'yacute': 253,
-    'yuml': 255,
-    'copy': 169,
-    'reg': 174,
-    'nbsp': 160,
-    'iexcl': 161,
-    'cent': 162,
-    'pound': 163,
-    'curren': 164,
-    'yen': 165,
-    'brvbar': 166,
-    'sect': 167,
-    'uml': 168,
-    'ordf': 170,
-    'laquo': 171,
-    'not': 172,
-    'shy': 173,
-    'macr': 175,
-    'deg': 176,
-    'plusmn': 177,
-    'sup1': 185,
-    'sup2': 178,
-    'sup3': 179,
-    'acute': 180,
-    'micro': 181,
-    'para': 182,
-    'middot': 183,
-    'cedil': 184,
-    'ordm': 186,
-    'raquo': 187,
-    'frac14': 188,
-    'frac12': 189,
-    'frac34': 190,
-    'iquest': 191,
-    'times': 215,
-    'divide': 247,
-    'OElig': 338,
-    'oelig': 339,
-    'Scaron': 352,
-    'scaron': 353,
-    'Yuml': 376,
-    'fnof': 402,
-    'circ': 710,
-    'tilde': 732,
-    'Alpha': 913,
-    'Beta': 914,
-    'Gamma': 915,
-    'Delta': 916,
-    'Epsilon': 917,
-    'Zeta': 918,
-    'Eta': 919,
-    'Theta': 920,
-    'Iota': 921,
-    'Kappa': 922,
-    'Lambda': 923,
-    'Mu': 924,
-    'Nu': 925,
-    'Xi': 926,
-    'Omicron': 927,
-    'Pi': 928,
-    'Rho': 929,
-    'Sigma': 931,
-    'Tau': 932,
-    'Upsilon': 933,
-    'Phi': 934,
-    'Chi': 935,
-    'Psi': 936,
-    'Omega': 937,
-    'alpha': 945,
-    'beta': 946,
-    'gamma': 947,
-    'delta': 948,
-    'epsilon': 949,
-    'zeta': 950,
-    'eta': 951,
-    'theta': 952,
-    'iota': 953,
-    'kappa': 954,
-    'lambda': 955,
-    'mu': 956,
-    'nu': 957,
-    'xi': 958,
-    'omicron': 959,
-    'pi': 960,
-    'rho': 961,
-    'sigmaf': 962,
-    'sigma': 963,
-    'tau': 964,
-    'upsilon': 965,
-    'phi': 966,
-    'chi': 967,
-    'psi': 968,
-    'omega': 969,
-    'thetasym': 977,
-    'upsih': 978,
-    'piv': 982,
-    'ensp': 8194,
-    'emsp': 8195,
-    'thinsp': 8201,
-    'zwnj': 8204,
-    'zwj': 8205,
-    'lrm': 8206,
-    'rlm': 8207,
-    'ndash': 8211,
-    'mdash': 8212,
-    'lsquo': 8216,
-    'rsquo': 8217,
-    'sbquo': 8218,
-    'ldquo': 8220,
-    'rdquo': 8221,
-    'bdquo': 8222,
-    'dagger': 8224,
-    'Dagger': 8225,
-    'bull': 8226,
-    'hellip': 8230,
-    'permil': 8240,
-    'prime': 8242,
-    'Prime': 8243,
-    'lsaquo': 8249,
-    'rsaquo': 8250,
-    'oline': 8254,
-    'frasl': 8260,
-    'euro': 8364,
-    'image': 8465,
-    'weierp': 8472,
-    'real': 8476,
-    'trade': 8482,
-    'alefsym': 8501,
-    'larr': 8592,
-    'uarr': 8593,
-    'rarr': 8594,
-    'darr': 8595,
-    'harr': 8596,
-    'crarr': 8629,
-    'lArr': 8656,
-    'uArr': 8657,
-    'rArr': 8658,
-    'dArr': 8659,
-    'hArr': 8660,
-    'forall': 8704,
-    'part': 8706,
-    'exist': 8707,
-    'empty': 8709,
-    'nabla': 8711,
-    'isin': 8712,
-    'notin': 8713,
-    'ni': 8715,
-    'prod': 8719,
-    'sum': 8721,
-    'minus': 8722,
-    'lowast': 8727,
-    'radic': 8730,
-    'prop': 8733,
-    'infin': 8734,
-    'ang': 8736,
-    'and': 8743,
-    'or': 8744,
-    'cap': 8745,
-    'cup': 8746,
-    'int': 8747,
-    'there4': 8756,
-    'sim': 8764,
-    'cong': 8773,
-    'asymp': 8776,
-    'ne': 8800,
-    'equiv': 8801,
-    'le': 8804,
-    'ge': 8805,
-    'sub': 8834,
-    'sup': 8835,
-    'nsub': 8836,
-    'sube': 8838,
-    'supe': 8839,
-    'oplus': 8853,
-    'otimes': 8855,
-    'perp': 8869,
-    'sdot': 8901,
-    'lceil': 8968,
-    'rceil': 8969,
-    'lfloor': 8970,
-    'rfloor': 8971,
-    'lang': 9001,
-    'rang': 9002,
-    'loz': 9674,
-    'spades': 9824,
-    'clubs': 9827,
-    'hearts': 9829,
-    'diams': 9830
+    amp: '&',
+    gt: '>',
+    lt: '<',
+    quot: '"',
+    apos: "'",
+    AElig: 198,
+    Aacute: 193,
+    Acirc: 194,
+    Agrave: 192,
+    Aring: 197,
+    Atilde: 195,
+    Auml: 196,
+    Ccedil: 199,
+    ETH: 208,
+    Eacute: 201,
+    Ecirc: 202,
+    Egrave: 200,
+    Euml: 203,
+    Iacute: 205,
+    Icirc: 206,
+    Igrave: 204,
+    Iuml: 207,
+    Ntilde: 209,
+    Oacute: 211,
+    Ocirc: 212,
+    Ograve: 210,
+    Oslash: 216,
+    Otilde: 213,
+    Ouml: 214,
+    THORN: 222,
+    Uacute: 218,
+    Ucirc: 219,
+    Ugrave: 217,
+    Uuml: 220,
+    Yacute: 221,
+    aacute: 225,
+    acirc: 226,
+    aelig: 230,
+    agrave: 224,
+    aring: 229,
+    atilde: 227,
+    auml: 228,
+    ccedil: 231,
+    eacute: 233,
+    ecirc: 234,
+    egrave: 232,
+    eth: 240,
+    euml: 235,
+    iacute: 237,
+    icirc: 238,
+    igrave: 236,
+    iuml: 239,
+    ntilde: 241,
+    oacute: 243,
+    ocirc: 244,
+    ograve: 242,
+    oslash: 248,
+    otilde: 245,
+    ouml: 246,
+    szlig: 223,
+    thorn: 254,
+    uacute: 250,
+    ucirc: 251,
+    ugrave: 249,
+    uuml: 252,
+    yacute: 253,
+    yuml: 255,
+    copy: 169,
+    reg: 174,
+    nbsp: 160,
+    iexcl: 161,
+    cent: 162,
+    pound: 163,
+    curren: 164,
+    yen: 165,
+    brvbar: 166,
+    sect: 167,
+    uml: 168,
+    ordf: 170,
+    laquo: 171,
+    not: 172,
+    shy: 173,
+    macr: 175,
+    deg: 176,
+    plusmn: 177,
+    sup1: 185,
+    sup2: 178,
+    sup3: 179,
+    acute: 180,
+    micro: 181,
+    para: 182,
+    middot: 183,
+    cedil: 184,
+    ordm: 186,
+    raquo: 187,
+    frac14: 188,
+    frac12: 189,
+    frac34: 190,
+    iquest: 191,
+    times: 215,
+    divide: 247,
+    OElig: 338,
+    oelig: 339,
+    Scaron: 352,
+    scaron: 353,
+    Yuml: 376,
+    fnof: 402,
+    circ: 710,
+    tilde: 732,
+    Alpha: 913,
+    Beta: 914,
+    Gamma: 915,
+    Delta: 916,
+    Epsilon: 917,
+    Zeta: 918,
+    Eta: 919,
+    Theta: 920,
+    Iota: 921,
+    Kappa: 922,
+    Lambda: 923,
+    Mu: 924,
+    Nu: 925,
+    Xi: 926,
+    Omicron: 927,
+    Pi: 928,
+    Rho: 929,
+    Sigma: 931,
+    Tau: 932,
+    Upsilon: 933,
+    Phi: 934,
+    Chi: 935,
+    Psi: 936,
+    Omega: 937,
+    alpha: 945,
+    beta: 946,
+    gamma: 947,
+    delta: 948,
+    epsilon: 949,
+    zeta: 950,
+    eta: 951,
+    theta: 952,
+    iota: 953,
+    kappa: 954,
+    lambda: 955,
+    mu: 956,
+    nu: 957,
+    xi: 958,
+    omicron: 959,
+    pi: 960,
+    rho: 961,
+    sigmaf: 962,
+    sigma: 963,
+    tau: 964,
+    upsilon: 965,
+    phi: 966,
+    chi: 967,
+    psi: 968,
+    omega: 969,
+    thetasym: 977,
+    upsih: 978,
+    piv: 982,
+    ensp: 8194,
+    emsp: 8195,
+    thinsp: 8201,
+    zwnj: 8204,
+    zwj: 8205,
+    lrm: 8206,
+    rlm: 8207,
+    ndash: 8211,
+    mdash: 8212,
+    lsquo: 8216,
+    rsquo: 8217,
+    sbquo: 8218,
+    ldquo: 8220,
+    rdquo: 8221,
+    bdquo: 8222,
+    dagger: 8224,
+    Dagger: 8225,
+    bull: 8226,
+    hellip: 8230,
+    permil: 8240,
+    prime: 8242,
+    Prime: 8243,
+    lsaquo: 8249,
+    rsaquo: 8250,
+    oline: 8254,
+    frasl: 8260,
+    euro: 8364,
+    image: 8465,
+    weierp: 8472,
+    real: 8476,
+    trade: 8482,
+    alefsym: 8501,
+    larr: 8592,
+    uarr: 8593,
+    rarr: 8594,
+    darr: 8595,
+    harr: 8596,
+    crarr: 8629,
+    lArr: 8656,
+    uArr: 8657,
+    rArr: 8658,
+    dArr: 8659,
+    hArr: 8660,
+    forall: 8704,
+    part: 8706,
+    exist: 8707,
+    empty: 8709,
+    nabla: 8711,
+    isin: 8712,
+    notin: 8713,
+    ni: 8715,
+    prod: 8719,
+    sum: 8721,
+    minus: 8722,
+    lowast: 8727,
+    radic: 8730,
+    prop: 8733,
+    infin: 8734,
+    ang: 8736,
+    and: 8743,
+    or: 8744,
+    cap: 8745,
+    cup: 8746,
+    int: 8747,
+    there4: 8756,
+    sim: 8764,
+    cong: 8773,
+    asymp: 8776,
+    ne: 8800,
+    equiv: 8801,
+    le: 8804,
+    ge: 8805,
+    sub: 8834,
+    sup: 8835,
+    nsub: 8836,
+    sube: 8838,
+    supe: 8839,
+    oplus: 8853,
+    otimes: 8855,
+    perp: 8869,
+    sdot: 8901,
+    lceil: 8968,
+    rceil: 8969,
+    lfloor: 8970,
+    rfloor: 8971,
+    lang: 9001,
+    rang: 9002,
+    loz: 9674,
+    spades: 9824,
+    clubs: 9827,
+    hearts: 9829,
+    diams: 9830,
   }
 
   Object.keys(sax.ENTITIES).forEach(function (key) {
@@ -35632,33 +35702,90 @@ minimatch.Minimatch = Minimatch
   // shorthand
   S = sax.STATE
 
-  function emit (parser, event, data) {
+  function emit(parser, event, data) {
     parser[event] && parser[event](data)
   }
 
-  function emitNode (parser, nodeType, data) {
+  function getDeclaredEncoding(body) {
+    var match = body && body.match(/(?:^|\s)encoding\s*=\s*(['"])([^'"]+)\1/i)
+    return match ? match[2] : null
+  }
+
+  function normalizeEncodingName(encoding) {
+    if (!encoding) {
+      return null
+    }
+
+    return encoding.toLowerCase().replace(/[^a-z0-9]/g, '')
+  }
+
+  function encodingsMatch(detectedEncoding, declaredEncoding) {
+    const detected = normalizeEncodingName(detectedEncoding)
+    const declared = normalizeEncodingName(declaredEncoding)
+
+    if (!detected || !declared) {
+      return true
+    }
+
+    if (declared === 'utf16') {
+      return detected === 'utf16le' || detected === 'utf16be'
+    }
+
+    return detected === declared
+  }
+
+  function validateXmlDeclarationEncoding(parser, data) {
+    if (
+      !parser.strict ||
+      !parser.encoding ||
+      !data ||
+      data.name !== 'xml'
+    ) {
+      return
+    }
+
+    var declaredEncoding = getDeclaredEncoding(data.body)
+    if (
+      declaredEncoding &&
+      !encodingsMatch(parser.encoding, declaredEncoding)
+    ) {
+      strictFail(
+        parser,
+        'XML declaration encoding ' +
+          declaredEncoding +
+          ' does not match detected stream encoding ' +
+          parser.encoding.toUpperCase()
+      )
+    }
+  }
+
+  function emitNode(parser, nodeType, data) {
     if (parser.textNode) closeText(parser)
     emit(parser, nodeType, data)
   }
 
-  function closeText (parser) {
+  function closeText(parser) {
     parser.textNode = textopts(parser.opt, parser.textNode)
     if (parser.textNode) emit(parser, 'ontext', parser.textNode)
     parser.textNode = ''
   }
 
-  function textopts (opt, text) {
+  function textopts(opt, text) {
     if (opt.trim) text = text.trim()
     if (opt.normalize) text = text.replace(/\s+/g, ' ')
     return text
   }
 
-  function error (parser, er) {
+  function error(parser, er) {
     closeText(parser)
     if (parser.trackPosition) {
-      er += '\nLine: ' + parser.line +
-        '\nColumn: ' + parser.column +
-        '\nChar: ' + parser.c
+      er +=
+        '\nLine: ' +
+        parser.line +
+        '\nColumn: ' +
+        parser.column +
+        '\nChar: ' +
+        parser.c
     }
     er = new Error(er)
     parser.error = er
@@ -35666,11 +35793,14 @@ minimatch.Minimatch = Minimatch
     return parser
   }
 
-  function end (parser) {
-    if (parser.sawRoot && !parser.closedRoot) strictFail(parser, 'Unclosed root tag')
-    if ((parser.state !== S.BEGIN) &&
-      (parser.state !== S.BEGIN_WHITESPACE) &&
-      (parser.state !== S.TEXT)) {
+  function end(parser) {
+    if (parser.sawRoot && !parser.closedRoot)
+      strictFail(parser, 'Unclosed root tag')
+    if (
+      parser.state !== S.BEGIN &&
+      parser.state !== S.BEGIN_WHITESPACE &&
+      parser.state !== S.TEXT
+    ) {
       error(parser, 'Unexpected end')
     }
     closeText(parser)
@@ -35681,7 +35811,7 @@ minimatch.Minimatch = Minimatch
     return parser
   }
 
-  function strictFail (parser, message) {
+  function strictFail(parser, message) {
     if (typeof parser !== 'object' || !(parser instanceof SAXParser)) {
       throw new Error('bad call to strictFail')
     }
@@ -35690,10 +35820,10 @@ minimatch.Minimatch = Minimatch
     }
   }
 
-  function newTag (parser) {
+  function newTag(parser) {
     if (!parser.strict) parser.tagName = parser.tagName[parser.looseCase]()
     var parent = parser.tags[parser.tags.length - 1] || parser
-    var tag = parser.tag = { name: parser.tagName, attributes: {} }
+    var tag = (parser.tag = { name: parser.tagName, attributes: {} })
 
     // will be overridden if tag contails an xmlns="foo" or xmlns:foo="bar"
     if (parser.opt.xmlns) {
@@ -35703,9 +35833,9 @@ minimatch.Minimatch = Minimatch
     emitNode(parser, 'onopentagstart', tag)
   }
 
-  function qname (name, attribute) {
+  function qname(name, attribute) {
     var i = name.indexOf(':')
-    var qualName = i < 0 ? [ '', name ] : name.split(':')
+    var qualName = i < 0 ? ['', name] : name.split(':')
     var prefix = qualName[0]
     var local = qualName[1]
 
@@ -35718,13 +35848,15 @@ minimatch.Minimatch = Minimatch
     return { prefix: prefix, local: local }
   }
 
-  function attrib (parser) {
+  function attrib(parser) {
     if (!parser.strict) {
       parser.attribName = parser.attribName[parser.looseCase]()
     }
 
-    if (parser.attribList.indexOf(parser.attribName) !== -1 ||
-      parser.tag.attributes.hasOwnProperty(parser.attribName)) {
+    if (
+      parser.attribList.indexOf(parser.attribName) !== -1 ||
+      parser.tag.attributes.hasOwnProperty(parser.attribName)
+    ) {
       parser.attribName = parser.attribValue = ''
       return
     }
@@ -35737,13 +35869,26 @@ minimatch.Minimatch = Minimatch
       if (prefix === 'xmlns') {
         // namespace binding attribute. push the binding into scope
         if (local === 'xml' && parser.attribValue !== XML_NAMESPACE) {
-          strictFail(parser,
-            'xml: prefix must be bound to ' + XML_NAMESPACE + '\n' +
-            'Actual: ' + parser.attribValue)
-        } else if (local === 'xmlns' && parser.attribValue !== XMLNS_NAMESPACE) {
-          strictFail(parser,
-            'xmlns: prefix must be bound to ' + XMLNS_NAMESPACE + '\n' +
-            'Actual: ' + parser.attribValue)
+          strictFail(
+            parser,
+            'xml: prefix must be bound to ' +
+              XML_NAMESPACE +
+              '\n' +
+              'Actual: ' +
+              parser.attribValue
+          )
+        } else if (
+          local === 'xmlns' &&
+          parser.attribValue !== XMLNS_NAMESPACE
+        ) {
+          strictFail(
+            parser,
+            'xmlns: prefix must be bound to ' +
+              XMLNS_NAMESPACE +
+              '\n' +
+              'Actual: ' +
+              parser.attribValue
+          )
         } else {
           var tag = parser.tag
           var parent = parser.tags[parser.tags.length - 1] || parser
@@ -35763,14 +35908,14 @@ minimatch.Minimatch = Minimatch
       parser.tag.attributes[parser.attribName] = parser.attribValue
       emitNode(parser, 'onattribute', {
         name: parser.attribName,
-        value: parser.attribValue
+        value: parser.attribValue,
       })
     }
 
     parser.attribName = parser.attribValue = ''
   }
 
-  function openTag (parser, selfClosing) {
+  function openTag(parser, selfClosing) {
     if (parser.opt.xmlns) {
       // emit namespace binding events
       var tag = parser.tag
@@ -35782,8 +35927,10 @@ minimatch.Minimatch = Minimatch
       tag.uri = tag.ns[qn.prefix] || ''
 
       if (tag.prefix && !tag.uri) {
-        strictFail(parser, 'Unbound namespace prefix: ' +
-          JSON.stringify(parser.tagName))
+        strictFail(
+          parser,
+          'Unbound namespace prefix: ' + JSON.stringify(parser.tagName)
+        )
         tag.uri = qn.prefix
       }
 
@@ -35792,7 +35939,7 @@ minimatch.Minimatch = Minimatch
         Object.keys(tag.ns).forEach(function (p) {
           emitNode(parser, 'onopennamespace', {
             prefix: p,
-            uri: tag.ns[p]
+            uri: tag.ns[p],
           })
         })
       }
@@ -35807,20 +35954,22 @@ minimatch.Minimatch = Minimatch
         var qualName = qname(name, true)
         var prefix = qualName.prefix
         var local = qualName.local
-        var uri = prefix === '' ? '' : (tag.ns[prefix] || '')
+        var uri = prefix === '' ? '' : tag.ns[prefix] || ''
         var a = {
           name: name,
           value: value,
           prefix: prefix,
           local: local,
-          uri: uri
+          uri: uri,
         }
 
         // if there's any attributes with an undefined namespace,
         // then fail on them now.
         if (prefix && prefix !== 'xmlns' && !uri) {
-          strictFail(parser, 'Unbound namespace prefix: ' +
-            JSON.stringify(prefix))
+          strictFail(
+            parser,
+            'Unbound namespace prefix: ' + JSON.stringify(prefix)
+          )
           a.uri = prefix
         }
         parser.tag.attributes[name] = a
@@ -35849,7 +35998,7 @@ minimatch.Minimatch = Minimatch
     parser.attribList.length = 0
   }
 
-  function closeTag (parser) {
+  function closeTag(parser) {
     if (!parser.tagName) {
       strictFail(parser, 'Weird empty close tag.')
       parser.textNode += '</>'
@@ -35896,7 +36045,7 @@ minimatch.Minimatch = Minimatch
     parser.tagName = tagName
     var s = parser.tags.length
     while (s-- > t) {
-      var tag = parser.tag = parser.tags.pop()
+      var tag = (parser.tag = parser.tags.pop())
       parser.tagName = parser.tag.name
       emitNode(parser, 'onclosetag', parser.tagName)
 
@@ -35920,7 +36069,7 @@ minimatch.Minimatch = Minimatch
     parser.state = S.TEXT
   }
 
-  function parseEntity (parser) {
+  function parseEntity(parser) {
     var entity = parser.entity
     var entityLC = entity.toLowerCase()
     var num
@@ -35945,7 +36094,12 @@ minimatch.Minimatch = Minimatch
       }
     }
     entity = entity.replace(/^0+/, '')
-    if (isNaN(num) || numStr.toLowerCase() !== entity) {
+    if (
+      isNaN(num) ||
+      numStr.toLowerCase() !== entity ||
+      num < 0 ||
+      num > 0x10ffff
+    ) {
       strictFail(parser, 'Invalid character entity')
       return '&' + parser.entity + ';'
     }
@@ -35953,7 +36107,7 @@ minimatch.Minimatch = Minimatch
     return String.fromCodePoint(num)
   }
 
-  function beginWhiteSpace (parser, c) {
+  function beginWhiteSpace(parser, c) {
     if (c === '<') {
       parser.state = S.OPEN_WAKA
       parser.startTagPosition = parser.position
@@ -35966,7 +36120,7 @@ minimatch.Minimatch = Minimatch
     }
   }
 
-  function charAt (chunk, i) {
+  function charAt(chunk, i) {
     var result = ''
     if (i < chunk.length) {
       result = chunk.charAt(i)
@@ -35974,14 +36128,16 @@ minimatch.Minimatch = Minimatch
     return result
   }
 
-  function write (chunk) {
+  function write(chunk) {
     var parser = this
     if (this.error) {
       throw this.error
     }
     if (parser.closed) {
-      return error(parser,
-        'Cannot write after close. Assign an onready handler.')
+      return error(
+        parser,
+        'Cannot write after close. Assign an onready handler.'
+      )
     }
     if (chunk === null) {
       return end(parser)
@@ -36039,11 +36195,17 @@ minimatch.Minimatch = Minimatch
             }
             parser.textNode += chunk.substring(starti, i - 1)
           }
-          if (c === '<' && !(parser.sawRoot && parser.closedRoot && !parser.strict)) {
+          if (
+            c === '<' &&
+            !(parser.sawRoot && parser.closedRoot && !parser.strict)
+          ) {
             parser.state = S.OPEN_WAKA
             parser.startTagPosition = parser.position
           } else {
-            if (!isWhitespace(c) && (!parser.sawRoot || parser.closedRoot)) {
+            if (
+              !isWhitespace(c) &&
+              (!parser.sawRoot || parser.closedRoot)
+            ) {
               strictFail(parser, 'Text data outside of root node.')
             }
             if (c === '&') {
@@ -36101,20 +36263,33 @@ minimatch.Minimatch = Minimatch
           continue
 
         case S.SGML_DECL:
-          if ((parser.sgmlDecl + c).toUpperCase() === CDATA) {
+          if (parser.sgmlDecl + c === '--') {
+            parser.state = S.COMMENT
+            parser.comment = ''
+            parser.sgmlDecl = ''
+            continue
+          }
+
+          if (
+            parser.doctype &&
+            parser.doctype !== true &&
+            parser.sgmlDecl
+          ) {
+            parser.state = S.DOCTYPE_DTD
+            parser.doctype += '<!' + parser.sgmlDecl + c
+            parser.sgmlDecl = ''
+          } else if ((parser.sgmlDecl + c).toUpperCase() === CDATA) {
             emitNode(parser, 'onopencdata')
             parser.state = S.CDATA
             parser.sgmlDecl = ''
             parser.cdata = ''
-          } else if (parser.sgmlDecl + c === '--') {
-            parser.state = S.COMMENT
-            parser.comment = ''
-            parser.sgmlDecl = ''
           } else if ((parser.sgmlDecl + c).toUpperCase() === DOCTYPE) {
             parser.state = S.DOCTYPE
             if (parser.doctype || parser.sawRoot) {
-              strictFail(parser,
-                'Inappropriately located doctype declaration')
+              strictFail(
+                parser,
+                'Inappropriately located doctype declaration'
+              )
             }
             parser.doctype = ''
             parser.sgmlDecl = ''
@@ -36163,12 +36338,18 @@ minimatch.Minimatch = Minimatch
           continue
 
         case S.DOCTYPE_DTD:
-          parser.doctype += c
           if (c === ']') {
+            parser.doctype += c
             parser.state = S.DOCTYPE
+          } else if (c === '<') {
+            parser.state = S.OPEN_WAKA
+            parser.startTagPosition = parser.position
           } else if (isQuote(c)) {
+            parser.doctype += c
             parser.state = S.DOCTYPE_DTD_QUOTED
             parser.q = c
+          } else {
+            parser.doctype += c
           }
           continue
 
@@ -36209,16 +36390,30 @@ minimatch.Minimatch = Minimatch
             // which is a comment of " blah -- bloo "
             parser.comment += '--' + c
             parser.state = S.COMMENT
+          } else if (parser.doctype && parser.doctype !== true) {
+            parser.state = S.DOCTYPE_DTD
           } else {
             parser.state = S.TEXT
           }
           continue
 
         case S.CDATA:
+          var starti = i - 1
+          while (c && c !== ']') {
+            c = charAt(chunk, i++)
+            if (c && parser.trackPosition) {
+              parser.position++
+              if (c === '\n') {
+                parser.line++
+                parser.column = 0
+              } else {
+                parser.column++
+              }
+            }
+          }
+          parser.cdata += chunk.substring(starti, i - 1)
           if (c === ']') {
             parser.state = S.CDATA_ENDING
-          } else {
-            parser.cdata += c
           }
           continue
 
@@ -36269,10 +36464,12 @@ minimatch.Minimatch = Minimatch
 
         case S.PROC_INST_ENDING:
           if (c === '>') {
-            emitNode(parser, 'onprocessinginstruction', {
+            const procInstEndData = {
               name: parser.procInstName,
-              body: parser.procInstBody
-            })
+              body: parser.procInstBody,
+            }
+            validateXmlDeclarationEncoding(parser, procInstEndData)
+            emitNode(parser, 'onprocessinginstruction', procInstEndData)
             parser.procInstName = parser.procInstBody = ''
             parser.state = S.TEXT
           } else {
@@ -36304,7 +36501,10 @@ minimatch.Minimatch = Minimatch
             openTag(parser, true)
             closeTag(parser)
           } else {
-            strictFail(parser, 'Forward-slash in opening tag not followed by >')
+            strictFail(
+              parser,
+              'Forward-slash in opening tag not followed by >'
+            )
             parser.state = S.ATTRIB
           }
           continue
@@ -36354,7 +36554,7 @@ minimatch.Minimatch = Minimatch
             parser.attribValue = ''
             emitNode(parser, 'onattribute', {
               name: parser.attribName,
-              value: ''
+              value: '',
             })
             parser.attribName = ''
             if (c === '>') {
@@ -36376,7 +36576,9 @@ minimatch.Minimatch = Minimatch
             parser.q = c
             parser.state = S.ATTRIB_VALUE_QUOTED
           } else {
-            strictFail(parser, 'Unquoted attribute value')
+            if (!parser.opt.unquotedAttributeValues) {
+              error(parser, 'Unquoted attribute value')
+            }
             parser.state = S.ATTRIB_VALUE_UNQUOTED
             parser.attribValue = c
           }
@@ -36449,7 +36651,7 @@ minimatch.Minimatch = Minimatch
           } else if (isMatch(nameBody, c)) {
             parser.tagName += c
           } else if (parser.script) {
-            parser.script += '</' + parser.tagName
+            parser.script += '</' + parser.tagName + c
             parser.tagName = ''
             parser.state = S.SCRIPT
           } else {
@@ -36494,17 +36696,37 @@ minimatch.Minimatch = Minimatch
           }
 
           if (c === ';') {
-            if (parser.opt.unparsedEntities) {
-              var parsedEntity = parseEntity(parser)
+            var parsedEntity = parseEntity(parser)
+            if (
+              parser.opt.unparsedEntities &&
+              !Object.values(sax.XML_ENTITIES).includes(parsedEntity)
+            ) {
+              if ((parser.entityCount += 1) > parser.opt.maxEntityCount) {
+                error(
+                  parser,
+                  'Parsed entity count exceeds max entity count'
+                )
+              }
+
+              if ((parser.entityDepth += 1) > parser.opt.maxEntityDepth) {
+                error(
+                  parser,
+                  'Parsed entity depth exceeds max entity depth'
+                )
+              }
+
               parser.entity = ''
               parser.state = returnState
               parser.write(parsedEntity)
+              parser.entityDepth -= 1
             } else {
-              parser[buffer] += parseEntity(parser)
+              parser[buffer] += parsedEntity
               parser.entity = ''
               parser.state = returnState
             }
-          } else if (isMatch(parser.entity.length ? entityBody : entityStart, c)) {
+          } else if (
+            isMatch(parser.entity.length ? entityBody : entityStart, c)
+          ) {
             parser.entity += c
           } else {
             strictFail(parser, 'Invalid character in entity name')
@@ -36530,7 +36752,7 @@ minimatch.Minimatch = Minimatch
   /*! http://mths.be/fromcodepoint v0.1.0 by @mathias */
   /* istanbul ignore next */
   if (!String.fromCodePoint) {
-    (function () {
+    ;(function () {
       var stringFromCharCode = String.fromCharCode
       var floor = Math.floor
       var fromCodePoint = function () {
@@ -36549,18 +36771,20 @@ minimatch.Minimatch = Minimatch
           if (
             !isFinite(codePoint) || // `NaN`, `+Infinity`, or `-Infinity`
             codePoint < 0 || // not a valid Unicode code point
-            codePoint > 0x10FFFF || // not a valid Unicode code point
+            codePoint > 0x10ffff || // not a valid Unicode code point
             floor(codePoint) !== codePoint // not an integer
           ) {
             throw RangeError('Invalid code point: ' + codePoint)
           }
-          if (codePoint <= 0xFFFF) { // BMP code point
+          if (codePoint <= 0xffff) {
+            // BMP code point
             codeUnits.push(codePoint)
-          } else { // Astral code point; split in surrogate halves
+          } else {
+            // Astral code point; split in surrogate halves
             // http://mathiasbynens.be/notes/javascript-encoding#surrogate-formulae
             codePoint -= 0x10000
-            highSurrogate = (codePoint >> 10) + 0xD800
-            lowSurrogate = (codePoint % 0x400) + 0xDC00
+            highSurrogate = (codePoint >> 10) + 0xd800
+            lowSurrogate = (codePoint % 0x400) + 0xdc00
             codeUnits.push(highSurrogate, lowSurrogate)
           }
           if (index + 1 === length || codeUnits.length > MAX_SIZE) {
@@ -36575,14 +36799,14 @@ minimatch.Minimatch = Minimatch
         Object.defineProperty(String, 'fromCodePoint', {
           value: fromCodePoint,
           configurable: true,
-          writable: true
+          writable: true,
         })
       } else {
         String.fromCodePoint = fromCodePoint
       }
-    }())
+    })()
   }
-})( false ? 0 : exports)
+})( false ? (0) : exports)
 
 
 /***/ }),
@@ -36590,42 +36814,43 @@ minimatch.Minimatch = Minimatch
 /***/ 6204:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const { EventEmitter } = __nccwpck_require__(4434)
-const STREAM_DESTROYED = new Error('Stream was destroyed')
-const PREMATURE_CLOSE = new Error('Premature close')
-
-const queueTick = __nccwpck_require__(3125)
+const { EventEmitter } = __nccwpck_require__(9580)
 const FIFO = __nccwpck_require__(3867)
+const TextDecoder = __nccwpck_require__(7934)
 
-/* eslint-disable no-multi-spaces */
+const StreamError = __nccwpck_require__(5657)
 
-// 28 bits used total (4 from shared, 14 from read, and 10 from write)
-const MAX = ((1 << 28) - 1)
+// if we do a future major, expect queue microtask to be there always, for now a bit defensive
+const qmt =
+  typeof queueMicrotask === 'undefined' ? (fn) => global.process.nextTick(fn) : queueMicrotask
+
+// 29 bits used total (4 from shared, 14 from read, and 11 from write)
+const MAX = (1 << 29) - 1
 
 // Shared state
-const OPENING       = 0b0001
+const OPENING = 0b0001
 const PREDESTROYING = 0b0010
-const DESTROYING    = 0b0100
-const DESTROYED     = 0b1000
+const DESTROYING = 0b0100
+const DESTROYED = 0b1000
 
 const NOT_OPENING = MAX ^ OPENING
 const NOT_PREDESTROYING = MAX ^ PREDESTROYING
 
 // Read state (4 bit offset from shared state)
-const READ_ACTIVE           = 0b00000000000001 << 4
-const READ_UPDATING         = 0b00000000000010 << 4
-const READ_PRIMARY          = 0b00000000000100 << 4
-const READ_QUEUED           = 0b00000000001000 << 4
-const READ_RESUMED          = 0b00000000010000 << 4
-const READ_PIPE_DRAINED     = 0b00000000100000 << 4
-const READ_ENDING           = 0b00000001000000 << 4
-const READ_EMIT_DATA        = 0b00000010000000 << 4
-const READ_EMIT_READABLE    = 0b00000100000000 << 4
+const READ_ACTIVE = 0b00000000000001 << 4
+const READ_UPDATING = 0b00000000000010 << 4
+const READ_PRIMARY = 0b00000000000100 << 4
+const READ_QUEUED = 0b00000000001000 << 4
+const READ_RESUMED = 0b00000000010000 << 4
+const READ_PIPE_DRAINED = 0b00000000100000 << 4
+const READ_ENDING = 0b00000001000000 << 4
+const READ_EMIT_DATA = 0b00000010000000 << 4
+const READ_EMIT_READABLE = 0b00000100000000 << 4
 const READ_EMITTED_READABLE = 0b00001000000000 << 4
-const READ_DONE             = 0b00010000000000 << 4
-const READ_NEXT_TICK        = 0b00100000000000 << 4
-const READ_NEEDS_PUSH       = 0b01000000000000 << 4
-const READ_READ_AHEAD       = 0b10000000000000 << 4
+const READ_DONE = 0b00010000000000 << 4
+const READ_NEXT_TICK = 0b00100000000000 << 4
+const READ_NEEDS_PUSH = 0b01000000000000 << 4
+const READ_READ_AHEAD = 0b10000000000000 << 4
 
 // Combined read state
 const READ_FLOWING = READ_RESUMED | READ_PIPE_DRAINED
@@ -36634,38 +36859,40 @@ const READ_PRIMARY_AND_ACTIVE = READ_PRIMARY | READ_ACTIVE
 const READ_EMIT_READABLE_AND_QUEUED = READ_EMIT_READABLE | READ_QUEUED
 const READ_RESUMED_READ_AHEAD = READ_RESUMED | READ_READ_AHEAD
 
-const READ_NOT_ACTIVE             = MAX ^ READ_ACTIVE
-const READ_NON_PRIMARY            = MAX ^ READ_PRIMARY
+const READ_NOT_ACTIVE = MAX ^ READ_ACTIVE
+const READ_NON_PRIMARY = MAX ^ READ_PRIMARY
 const READ_NON_PRIMARY_AND_PUSHED = MAX ^ (READ_PRIMARY | READ_NEEDS_PUSH)
-const READ_PUSHED                 = MAX ^ READ_NEEDS_PUSH
-const READ_PAUSED                 = MAX ^ READ_RESUMED
-const READ_NOT_QUEUED             = MAX ^ (READ_QUEUED | READ_EMITTED_READABLE)
-const READ_NOT_ENDING             = MAX ^ READ_ENDING
-const READ_PIPE_NOT_DRAINED       = MAX ^ READ_FLOWING
-const READ_NOT_NEXT_TICK          = MAX ^ READ_NEXT_TICK
-const READ_NOT_UPDATING           = MAX ^ READ_UPDATING
-const READ_NO_READ_AHEAD          = MAX ^ READ_READ_AHEAD
-const READ_PAUSED_NO_READ_AHEAD   = MAX ^ READ_RESUMED_READ_AHEAD
+const READ_PUSHED = MAX ^ READ_NEEDS_PUSH
+const READ_PAUSED = MAX ^ READ_RESUMED
+const READ_NOT_QUEUED = MAX ^ (READ_QUEUED | READ_EMITTED_READABLE)
+const READ_NOT_ENDING = MAX ^ READ_ENDING
+const READ_PIPE_NOT_DRAINED = MAX ^ READ_FLOWING
+const READ_NOT_NEXT_TICK = MAX ^ READ_NEXT_TICK
+const READ_NOT_UPDATING = MAX ^ READ_UPDATING
+const READ_NO_READ_AHEAD = MAX ^ READ_READ_AHEAD
+const READ_PAUSED_NO_READ_AHEAD = MAX ^ READ_RESUMED_READ_AHEAD
 
-// Write state (18 bit offset, 4 bit offset from shared state and 13 from read state)
-const WRITE_ACTIVE     = 0b0000000001 << 18
-const WRITE_UPDATING   = 0b0000000010 << 18
-const WRITE_PRIMARY    = 0b0000000100 << 18
-const WRITE_QUEUED     = 0b0000001000 << 18
-const WRITE_UNDRAINED  = 0b0000010000 << 18
-const WRITE_DONE       = 0b0000100000 << 18
-const WRITE_EMIT_DRAIN = 0b0001000000 << 18
-const WRITE_NEXT_TICK  = 0b0010000000 << 18
-const WRITE_WRITING    = 0b0100000000 << 18
-const WRITE_FINISHING  = 0b1000000000 << 18
+// Write state (18 bit offset, 4 bit offset from shared state and 14 from read state)
+const WRITE_ACTIVE = 0b00000000001 << 18
+const WRITE_UPDATING = 0b00000000010 << 18
+const WRITE_PRIMARY = 0b00000000100 << 18
+const WRITE_QUEUED = 0b00000001000 << 18
+const WRITE_UNDRAINED = 0b00000010000 << 18
+const WRITE_DONE = 0b00000100000 << 18
+const WRITE_EMIT_DRAIN = 0b00001000000 << 18
+const WRITE_NEXT_TICK = 0b00010000000 << 18
+const WRITE_WRITING = 0b00100000000 << 18
+const WRITE_FINISHING = 0b01000000000 << 18
+const WRITE_CORKED = 0b10000000000 << 18
 
-const WRITE_NOT_ACTIVE    = MAX ^ (WRITE_ACTIVE | WRITE_WRITING)
-const WRITE_NON_PRIMARY   = MAX ^ WRITE_PRIMARY
-const WRITE_NOT_FINISHING = MAX ^ WRITE_FINISHING
-const WRITE_DRAINED       = MAX ^ WRITE_UNDRAINED
-const WRITE_NOT_QUEUED    = MAX ^ WRITE_QUEUED
+const WRITE_NOT_ACTIVE = MAX ^ (WRITE_ACTIVE | WRITE_WRITING)
+const WRITE_NON_PRIMARY = MAX ^ WRITE_PRIMARY
+const WRITE_NOT_FINISHING = MAX ^ (WRITE_ACTIVE | WRITE_FINISHING)
+const WRITE_DRAINED = MAX ^ WRITE_UNDRAINED
+const WRITE_NOT_QUEUED = MAX ^ WRITE_QUEUED
 const WRITE_NOT_NEXT_TICK = MAX ^ WRITE_NEXT_TICK
-const WRITE_NOT_UPDATING  = MAX ^ WRITE_UPDATING
+const WRITE_NOT_UPDATING = MAX ^ WRITE_UPDATING
+const WRITE_NOT_CORKED = MAX ^ WRITE_CORKED
 
 // Combined shared state
 const ACTIVE = READ_ACTIVE | WRITE_ACTIVE
@@ -36684,26 +36911,32 @@ const READ_PRIMARY_STATUS = OPEN_STATUS | READ_ENDING | READ_DONE
 const READ_STATUS = OPEN_STATUS | READ_DONE | READ_QUEUED
 const READ_ENDING_STATUS = OPEN_STATUS | READ_ENDING | READ_QUEUED
 const READ_READABLE_STATUS = OPEN_STATUS | READ_EMIT_READABLE | READ_QUEUED | READ_EMITTED_READABLE
-const SHOULD_NOT_READ = OPEN_STATUS | READ_ACTIVE | READ_ENDING | READ_DONE | READ_NEEDS_PUSH | READ_READ_AHEAD
+const SHOULD_NOT_READ =
+  OPEN_STATUS | READ_ACTIVE | READ_ENDING | READ_DONE | READ_NEEDS_PUSH | READ_READ_AHEAD
 const READ_BACKPRESSURE_STATUS = DESTROY_STATUS | READ_ENDING | READ_DONE
 const READ_UPDATE_SYNC_STATUS = READ_UPDATING | OPEN_STATUS | READ_NEXT_TICK | READ_PRIMARY
+const READ_NEXT_TICK_OR_OPENING = READ_NEXT_TICK | OPENING
 
 // Combined write state
 const WRITE_PRIMARY_STATUS = OPEN_STATUS | WRITE_FINISHING | WRITE_DONE
 const WRITE_QUEUED_AND_UNDRAINED = WRITE_QUEUED | WRITE_UNDRAINED
 const WRITE_QUEUED_AND_ACTIVE = WRITE_QUEUED | WRITE_ACTIVE
 const WRITE_DRAIN_STATUS = WRITE_QUEUED | WRITE_UNDRAINED | OPEN_STATUS | WRITE_ACTIVE
-const WRITE_STATUS = OPEN_STATUS | WRITE_ACTIVE | WRITE_QUEUED
+const WRITE_STATUS = OPEN_STATUS | WRITE_ACTIVE | WRITE_QUEUED | WRITE_CORKED
 const WRITE_PRIMARY_AND_ACTIVE = WRITE_PRIMARY | WRITE_ACTIVE
 const WRITE_ACTIVE_AND_WRITING = WRITE_ACTIVE | WRITE_WRITING
 const WRITE_FINISHING_STATUS = OPEN_STATUS | WRITE_FINISHING | WRITE_QUEUED_AND_ACTIVE | WRITE_DONE
 const WRITE_BACKPRESSURE_STATUS = WRITE_UNDRAINED | DESTROY_STATUS | WRITE_FINISHING | WRITE_DONE
 const WRITE_UPDATE_SYNC_STATUS = WRITE_UPDATING | OPEN_STATUS | WRITE_NEXT_TICK | WRITE_PRIMARY
+const WRITE_DROP_DATA = WRITE_FINISHING | WRITE_DONE | DESTROY_STATUS
 
 const asyncIterator = Symbol.asyncIterator || Symbol('asyncIterator')
 
 class WritableState {
-  constructor (stream, { highWaterMark = 16384, map = null, mapWritable, byteLength, byteLengthWritable } = {}) {
+  constructor(
+    stream,
+    { highWaterMark = 16384, map = null, mapWritable, byteLength, byteLengthWritable } = {}
+  ) {
     this.stream = stream
     this.queue = new FIFO()
     this.highWaterMark = highWaterMark
@@ -36717,11 +36950,16 @@ class WritableState {
     this.afterUpdateNextTick = updateWriteNT.bind(this)
   }
 
-  get ended () {
+  get ending() {
+    return (this.stream._duplexState & WRITE_FINISHING) !== 0
+  }
+
+  get ended() {
     return (this.stream._duplexState & WRITE_DONE) !== 0
   }
 
-  push (data) {
+  push(data) {
+    if ((this.stream._duplexState & WRITE_DROP_DATA) !== 0) return false
     if (this.map !== null) data = this.map(data)
 
     this.buffered += this.byteLength(data)
@@ -36736,7 +36974,7 @@ class WritableState {
     return false
   }
 
-  shift () {
+  shift() {
     const data = this.queue.shift()
 
     this.buffered -= this.byteLength(data)
@@ -36745,13 +36983,17 @@ class WritableState {
     return data
   }
 
-  end (data) {
-    if (typeof data === 'function') this.stream.once('finish', data)
-    else if (data !== undefined && data !== null) this.push(data)
+  end(data) {
+    if (typeof data === 'function') {
+      this.stream.once('finish', data)
+    } else if (data !== undefined && data !== null) {
+      this.push(data)
+    }
+
     this.stream._duplexState = (this.stream._duplexState | WRITE_FINISHING) & WRITE_NON_PRIMARY
   }
 
-  autoBatch (data, cb) {
+  autoBatch(data, cb) {
     const buffer = []
     const stream = this.stream
 
@@ -36764,7 +37006,7 @@ class WritableState {
     stream._writev(buffer, cb)
   }
 
-  update () {
+  update() {
     const stream = this.stream
 
     stream._duplexState |= WRITE_UPDATING
@@ -36782,11 +37024,11 @@ class WritableState {
     stream._duplexState &= WRITE_NOT_UPDATING
   }
 
-  updateNonPrimary () {
+  updateNonPrimary() {
     const stream = this.stream
 
     if ((stream._duplexState & WRITE_FINISHING_STATUS) === WRITE_FINISHING) {
-      stream._duplexState = (stream._duplexState | WRITE_ACTIVE) & WRITE_NOT_FINISHING
+      stream._duplexState = stream._duplexState | WRITE_ACTIVE
       stream._final(afterFinal.bind(this))
       return
     }
@@ -36805,26 +37047,32 @@ class WritableState {
     }
   }
 
-  continueUpdate () {
+  continueUpdate() {
     if ((this.stream._duplexState & WRITE_NEXT_TICK) === 0) return false
     this.stream._duplexState &= WRITE_NOT_NEXT_TICK
     return true
   }
 
-  updateCallback () {
-    if ((this.stream._duplexState & WRITE_UPDATE_SYNC_STATUS) === WRITE_PRIMARY) this.update()
-    else this.updateNextTick()
+  updateCallback() {
+    if ((this.stream._duplexState & WRITE_UPDATE_SYNC_STATUS) === WRITE_PRIMARY) {
+      this.update()
+    } else {
+      this.updateNextTick()
+    }
   }
 
-  updateNextTick () {
+  updateNextTick() {
     if ((this.stream._duplexState & WRITE_NEXT_TICK) !== 0) return
     this.stream._duplexState |= WRITE_NEXT_TICK
-    if ((this.stream._duplexState & WRITE_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & WRITE_UPDATING) === 0) qmt(this.afterUpdateNextTick)
   }
 }
 
 class ReadableState {
-  constructor (stream, { highWaterMark = 16384, map = null, mapReadable, byteLength, byteLengthReadable } = {}) {
+  constructor(
+    stream,
+    { highWaterMark = 16384, map = null, mapReadable, byteLength, byteLengthReadable } = {}
+  ) {
     this.stream = stream
     this.queue = new FIFO()
     this.highWaterMark = highWaterMark === 0 ? 1 : highWaterMark
@@ -36839,12 +37087,16 @@ class ReadableState {
     this.afterUpdateNextTick = updateReadNT.bind(this)
   }
 
-  get ended () {
+  get ending() {
+    return (this.stream._duplexState & READ_ENDING) !== 0
+  }
+
+  get ended() {
     return (this.stream._duplexState & READ_DONE) !== 0
   }
 
-  pipe (pipeTo, cb) {
-    if (this.pipeTo !== null) throw new Error('Can only pipe to one destination')
+  pipe(pipeTo, cb) {
+    if (this.pipeTo !== null) throw StreamError.BAD_ARGUMENT('Can only pipe to one destination')
     if (typeof cb !== 'function') cb = null
 
     this.stream._duplexState |= READ_PIPE_DRAINED
@@ -36870,7 +37122,7 @@ class ReadableState {
     pipeTo.emit('pipe', this.stream)
   }
 
-  push (data) {
+  push(data) {
     const stream = this.stream
 
     if (data === null) {
@@ -36879,7 +37131,14 @@ class ReadableState {
       return false
     }
 
-    if (this.map !== null) data = this.map(data)
+    if (this.map !== null) {
+      data = this.map(data)
+      if (data === null) {
+        stream._duplexState &= READ_PUSHED
+        return this.buffered < this.highWaterMark
+      }
+    }
+
     this.buffered += this.byteLength(data)
     this.queue.push(data)
 
@@ -36888,15 +37147,18 @@ class ReadableState {
     return this.buffered < this.highWaterMark
   }
 
-  shift () {
+  shift() {
     const data = this.queue.shift()
 
     this.buffered -= this.byteLength(data)
-    if (this.buffered === 0) this.stream._duplexState &= READ_NOT_QUEUED
+    if (this.buffered === 0) {
+      this.stream._duplexState &= READ_NOT_QUEUED
+    }
+
     return data
   }
 
-  unshift (data) {
+  unshift(data) {
     const pending = [this.map !== null ? this.map(data) : data]
     while (this.buffered > 0) pending.push(this.shift())
 
@@ -36909,13 +37171,20 @@ class ReadableState {
     this.push(pending[pending.length - 1])
   }
 
-  read () {
+  read() {
     const stream = this.stream
 
     if ((stream._duplexState & READ_STATUS) === READ_QUEUED) {
       const data = this.shift()
-      if (this.pipeTo !== null && this.pipeTo.write(data) === false) stream._duplexState &= READ_PIPE_NOT_DRAINED
-      if ((stream._duplexState & READ_EMIT_DATA) !== 0) stream.emit('data', data)
+
+      if (this.pipeTo !== null && this.pipeTo.write(data) === false) {
+        stream._duplexState &= READ_PIPE_NOT_DRAINED
+      }
+
+      if ((stream._duplexState & READ_EMIT_DATA) !== 0) {
+        stream.emit('data', data)
+      }
+
       return data
     }
 
@@ -36927,17 +37196,26 @@ class ReadableState {
     return null
   }
 
-  drain () {
+  drain() {
     const stream = this.stream
 
-    while ((stream._duplexState & READ_STATUS) === READ_QUEUED && (stream._duplexState & READ_FLOWING) !== 0) {
+    while (
+      (stream._duplexState & READ_STATUS) === READ_QUEUED &&
+      (stream._duplexState & READ_FLOWING) !== 0
+    ) {
       const data = this.shift()
-      if (this.pipeTo !== null && this.pipeTo.write(data) === false) stream._duplexState &= READ_PIPE_NOT_DRAINED
-      if ((stream._duplexState & READ_EMIT_DATA) !== 0) stream.emit('data', data)
+
+      if (this.pipeTo !== null && this.pipeTo.write(data) === false) {
+        stream._duplexState &= READ_PIPE_NOT_DRAINED
+      }
+
+      if ((stream._duplexState & READ_EMIT_DATA) !== 0) {
+        stream.emit('data', data)
+      }
     }
   }
 
-  update () {
+  update() {
     const stream = this.stream
 
     stream._duplexState |= READ_UPDATING
@@ -36945,7 +37223,10 @@ class ReadableState {
     do {
       this.drain()
 
-      while (this.buffered < this.highWaterMark && (stream._duplexState & SHOULD_NOT_READ) === READ_READ_AHEAD) {
+      while (
+        this.buffered < this.highWaterMark &&
+        (stream._duplexState & SHOULD_NOT_READ) === READ_READ_AHEAD
+      ) {
         stream._duplexState |= READ_ACTIVE_AND_NEEDS_PUSH
         stream._read(this.afterRead)
         this.drain()
@@ -36956,20 +37237,28 @@ class ReadableState {
         stream.emit('readable')
       }
 
-      if ((stream._duplexState & READ_PRIMARY_AND_ACTIVE) === 0) this.updateNonPrimary()
+      if ((stream._duplexState & READ_PRIMARY_AND_ACTIVE) === 0) {
+        this.updateNonPrimary()
+      }
     } while (this.continueUpdate() === true)
 
     stream._duplexState &= READ_NOT_UPDATING
   }
 
-  updateNonPrimary () {
+  updateNonPrimary() {
     const stream = this.stream
 
     if ((stream._duplexState & READ_ENDING_STATUS) === READ_ENDING) {
       stream._duplexState = (stream._duplexState | READ_DONE) & READ_NOT_ENDING
       stream.emit('end')
-      if ((stream._duplexState & AUTO_DESTROY) === DONE) stream._duplexState |= DESTROYING
-      if (this.pipeTo !== null) this.pipeTo.end()
+
+      if ((stream._duplexState & AUTO_DESTROY) === DONE) {
+        stream._duplexState |= DESTROYING
+      }
+
+      if (this.pipeTo !== null) {
+        this.pipeTo.end()
+      }
     }
 
     if ((stream._duplexState & DESTROY_STATUS) === DESTROYING) {
@@ -36986,26 +37275,35 @@ class ReadableState {
     }
   }
 
-  continueUpdate () {
+  continueUpdate() {
     if ((this.stream._duplexState & READ_NEXT_TICK) === 0) return false
     this.stream._duplexState &= READ_NOT_NEXT_TICK
     return true
   }
 
-  updateCallback () {
-    if ((this.stream._duplexState & READ_UPDATE_SYNC_STATUS) === READ_PRIMARY) this.update()
-    else this.updateNextTick()
+  updateCallback() {
+    if ((this.stream._duplexState & READ_UPDATE_SYNC_STATUS) === READ_PRIMARY) {
+      this.update()
+    } else {
+      this.updateNextTick()
+    }
   }
 
-  updateNextTick () {
+  updateNextTickIfOpen() {
+    if ((this.stream._duplexState & READ_NEXT_TICK_OR_OPENING) !== 0) return
+    this.stream._duplexState |= READ_NEXT_TICK
+    if ((this.stream._duplexState & READ_UPDATING) === 0) qmt(this.afterUpdateNextTick)
+  }
+
+  updateNextTick() {
     if ((this.stream._duplexState & READ_NEXT_TICK) !== 0) return
     this.stream._duplexState |= READ_NEXT_TICK
-    if ((this.stream._duplexState & READ_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & READ_UPDATING) === 0) qmt(this.afterUpdateNextTick)
   }
 }
 
 class TransformState {
-  constructor (stream) {
+  constructor(stream) {
     this.data = null
     this.afterTransform = afterTransform.bind(stream)
     this.afterFinal = null
@@ -37013,7 +37311,7 @@ class TransformState {
 }
 
 class Pipeline {
-  constructor (src, dst, cb) {
+  constructor(src, dst, cb) {
     this.from = src
     this.to = dst
     this.afterPipe = cb
@@ -37021,11 +37319,11 @@ class Pipeline {
     this.pipeToFinished = false
   }
 
-  finished () {
+  finished() {
     this.pipeToFinished = true
   }
 
-  done (stream, err) {
+  done(stream, err) {
     if (err) this.error = err
 
     if (stream === this.to) {
@@ -37033,7 +37331,7 @@ class Pipeline {
 
       if (this.from !== null) {
         if ((this.from._duplexState & READ_DONE) === 0 || !this.pipeToFinished) {
-          this.from.destroy(this.error || new Error('Writable stream closed prematurely'))
+          this.from.destroy(this.error || StreamError.PREMATURE_CLOSE('Writable stream closed'))
         }
         return
       }
@@ -37044,7 +37342,7 @@ class Pipeline {
 
       if (this.to !== null) {
         if ((stream._duplexState & READ_DONE) === 0) {
-          this.to.destroy(this.error || new Error('Readable stream closed before ending'))
+          this.to.destroy(this.error || StreamError.PREMATURE_CLOSE('Readable stream closed'))
         }
         return
       }
@@ -37055,49 +37353,62 @@ class Pipeline {
   }
 }
 
-function afterDrain () {
+function afterDrain() {
   this.stream._duplexState |= READ_PIPE_DRAINED
   this.updateCallback()
 }
 
-function afterFinal (err) {
+function afterFinal(err) {
   const stream = this.stream
   if (err) stream.destroy(err)
+
   if ((stream._duplexState & DESTROY_STATUS) === 0) {
     stream._duplexState |= WRITE_DONE
     stream.emit('finish')
   }
+
   if ((stream._duplexState & AUTO_DESTROY) === DONE) {
     stream._duplexState |= DESTROYING
   }
 
-  stream._duplexState &= WRITE_NOT_ACTIVE
+  stream._duplexState &= WRITE_NOT_FINISHING
 
   // no need to wait the extra tick here, so we short circuit that
-  if ((stream._duplexState & WRITE_UPDATING) === 0) this.update()
-  else this.updateNextTick()
+  if ((stream._duplexState & WRITE_UPDATING) === 0) {
+    this.update()
+  } else {
+    this.updateNextTick()
+  }
 }
 
-function afterDestroy (err) {
+function afterDestroy(err) {
   const stream = this.stream
 
-  if (!err && this.error !== STREAM_DESTROYED) err = this.error
+  if (!err && !StreamError.isStreamDestroyed(this.error)) err = this.error
   if (err) stream.emit('error', err)
+
   stream._duplexState |= DESTROYED
   stream.emit('close')
 
   const rs = stream._readableState
   const ws = stream._writableState
 
-  if (rs !== null && rs.pipeline !== null) rs.pipeline.done(stream, err)
+  if (rs !== null && rs.pipeline !== null) {
+    rs.pipeline.done(stream, err)
+  }
 
   if (ws !== null) {
-    while (ws.drains !== null && ws.drains.length > 0) ws.drains.shift().resolve(false)
-    if (ws.pipeline !== null) ws.pipeline.done(stream, err)
+    while (ws.drains !== null && ws.drains.length > 0) {
+      ws.drains.shift().resolve(false)
+    }
+
+    if (ws.pipeline !== null) {
+      ws.pipeline.done(stream, err)
+    }
   }
 }
 
-function afterWrite (err) {
+function afterWrite(err) {
   const stream = this.stream
 
   if (err) stream.destroy(err)
@@ -37107,6 +37418,7 @@ function afterWrite (err) {
 
   if ((stream._duplexState & WRITE_DRAIN_STATUS) === WRITE_UNDRAINED) {
     stream._duplexState &= WRITE_DRAINED
+
     if ((stream._duplexState & WRITE_EMIT_DRAIN) === WRITE_EMIT_DRAIN) {
       stream.emit('drain')
     }
@@ -37115,28 +37427,32 @@ function afterWrite (err) {
   this.updateCallback()
 }
 
-function afterRead (err) {
+function afterRead(err) {
   if (err) this.stream.destroy(err)
   this.stream._duplexState &= READ_NOT_ACTIVE
-  if (this.readAhead === false && (this.stream._duplexState & READ_RESUMED) === 0) this.stream._duplexState &= READ_NO_READ_AHEAD
+
+  if (this.readAhead === false && (this.stream._duplexState & READ_RESUMED) === 0) {
+    this.stream._duplexState &= READ_NO_READ_AHEAD
+  }
+
   this.updateCallback()
 }
 
-function updateReadNT () {
+function updateReadNT() {
   if ((this.stream._duplexState & READ_UPDATING) === 0) {
     this.stream._duplexState &= READ_NOT_NEXT_TICK
     this.update()
   }
 }
 
-function updateWriteNT () {
+function updateWriteNT() {
   if ((this.stream._duplexState & WRITE_UPDATING) === 0) {
     this.stream._duplexState &= WRITE_NOT_NEXT_TICK
     this.update()
   }
 }
 
-function tickDrains (drains) {
+function tickDrains(drains) {
   for (let i = 0; i < drains.length; i++) {
     // drains.writes are monotonic, so if one is 0 its always the first one
     if (--drains[i].writes === 0) {
@@ -37146,14 +37462,20 @@ function tickDrains (drains) {
   }
 }
 
-function afterOpen (err) {
+function afterOpen(err) {
   const stream = this.stream
 
   if (err) stream.destroy(err)
 
   if ((stream._duplexState & DESTROYING) === 0) {
-    if ((stream._duplexState & READ_PRIMARY_STATUS) === 0) stream._duplexState |= READ_PRIMARY
-    if ((stream._duplexState & WRITE_PRIMARY_STATUS) === 0) stream._duplexState |= WRITE_PRIMARY
+    if ((stream._duplexState & READ_PRIMARY_STATUS) === 0) {
+      stream._duplexState |= READ_PRIMARY
+    }
+
+    if ((stream._duplexState & WRITE_PRIMARY_STATUS) === 0) {
+      stream._duplexState |= WRITE_PRIMARY
+    }
+
     stream.emit('open')
   }
 
@@ -37168,15 +37490,15 @@ function afterOpen (err) {
   }
 }
 
-function afterTransform (err, data) {
+function afterTransform(err, data) {
   if (data !== undefined && data !== null) this.push(data)
   this._writableState.afterWrite(err)
 }
 
-function newListener (name) {
+function newListener(name) {
   if (this._readableState !== null) {
     if (name === 'data') {
-      this._duplexState |= (READ_EMIT_DATA | READ_RESUMED_READ_AHEAD)
+      this._duplexState |= READ_EMIT_DATA | READ_RESUMED_READ_AHEAD
       this._readableState.updateNextTick()
     }
     if (name === 'readable') {
@@ -37194,7 +37516,7 @@ function newListener (name) {
 }
 
 class Stream extends EventEmitter {
-  constructor (opts) {
+  constructor(opts) {
     super()
 
     this._duplexState = 0
@@ -37205,51 +37527,50 @@ class Stream extends EventEmitter {
       if (opts.open) this._open = opts.open
       if (opts.destroy) this._destroy = opts.destroy
       if (opts.predestroy) this._predestroy = opts.predestroy
-      if (opts.signal) {
-        opts.signal.addEventListener('abort', abort.bind(this))
-      }
+      if (opts.signal) opts.signal.addEventListener('abort', abort.bind(this))
     }
 
     this.on('newListener', newListener)
   }
 
-  _open (cb) {
+  _open(cb) {
     cb(null)
   }
 
-  _destroy (cb) {
+  _destroy(cb) {
     cb(null)
   }
 
-  _predestroy () {
+  _predestroy() {
     // does nothing
   }
 
-  get readable () {
+  get readable() {
     return this._readableState !== null ? true : undefined
   }
 
-  get writable () {
+  get writable() {
     return this._writableState !== null ? true : undefined
   }
 
-  get destroyed () {
+  get destroyed() {
     return (this._duplexState & DESTROYED) !== 0
   }
 
-  get destroying () {
+  get destroying() {
     return (this._duplexState & DESTROY_STATUS) !== 0
   }
 
-  destroy (err) {
+  destroy(err) {
     if ((this._duplexState & DESTROY_STATUS) === 0) {
-      if (!err) err = STREAM_DESTROYED
+      if (!err) err = StreamError.STREAM_DESTROYED()
       this._duplexState = (this._duplexState | DESTROYING) & NON_PRIMARY
 
       if (this._readableState !== null) {
         this._readableState.highWaterMark = 0
         this._readableState.error = err
       }
+
       if (this._writableState !== null) {
         this._writableState.highWaterMark = 0
         this._writableState.error = err
@@ -37259,14 +37580,19 @@ class Stream extends EventEmitter {
       this._predestroy()
       this._duplexState &= NOT_PREDESTROYING
 
-      if (this._readableState !== null) this._readableState.updateNextTick()
-      if (this._writableState !== null) this._writableState.updateNextTick()
+      if (this._readableState !== null) {
+        this._readableState.updateNextTick()
+      }
+
+      if (this._writableState !== null) {
+        this._writableState.updateNextTick()
+      }
     }
   }
 }
 
 class Readable extends Stream {
-  constructor (opts) {
+  constructor(opts) {
     super(opts)
 
     this._duplexState |= OPENING | WRITE_DONE | READ_READ_AHEAD
@@ -37276,57 +37602,85 @@ class Readable extends Stream {
       if (this._readableState.readAhead === false) this._duplexState &= READ_NO_READ_AHEAD
       if (opts.read) this._read = opts.read
       if (opts.eagerOpen) this._readableState.updateNextTick()
+      if (opts.encoding) this.setEncoding(opts.encoding)
     }
   }
 
-  _read (cb) {
+  static deferred(fn, opts) {
+    const out = new PassThrough(opts)
+
+    fn()
+      .then((src) => {
+        if (src === null) return out.end()
+        if (out.destroying) return
+        pipeline(src, out, noop)
+      })
+      .catch((err) => out.destroy(err))
+
+    return out
+  }
+
+  setEncoding(encoding) {
+    const dec = new TextDecoder(encoding)
+    const map = this._readableState.map || echo
+    this._readableState.map = mapOrSkip
+    return this
+
+    function mapOrSkip(data) {
+      const next = dec.push(data)
+      return next === '' && (data.byteLength !== 0 || dec.remaining > 0) ? null : map(next)
+    }
+  }
+
+  _read(cb) {
     cb(null)
   }
 
-  pipe (dest, cb) {
+  pipe(dest, cb) {
     this._readableState.updateNextTick()
     this._readableState.pipe(dest, cb)
     return dest
   }
 
-  read () {
+  read() {
     this._readableState.updateNextTick()
     return this._readableState.read()
   }
 
-  push (data) {
-    this._readableState.updateNextTick()
+  push(data) {
+    this._readableState.updateNextTickIfOpen()
     return this._readableState.push(data)
   }
 
-  unshift (data) {
-    this._readableState.updateNextTick()
+  unshift(data) {
+    this._readableState.updateNextTickIfOpen()
     return this._readableState.unshift(data)
   }
 
-  resume () {
+  resume() {
     this._duplexState |= READ_RESUMED_READ_AHEAD
     this._readableState.updateNextTick()
     return this
   }
 
-  pause () {
-    this._duplexState &= (this._readableState.readAhead === false ? READ_PAUSED_NO_READ_AHEAD : READ_PAUSED)
+  pause() {
+    this._duplexState &=
+      this._readableState.readAhead === false ? READ_PAUSED_NO_READ_AHEAD : READ_PAUSED
     return this
   }
 
-  static _fromAsyncIterator (ite, opts) {
+  static _fromAsyncIterator(ite, opts) {
     let destroy
 
     const rs = new Readable({
       ...opts,
-      read (cb) {
+      read(cb) {
         ite.next().then(push).then(cb.bind(null, null)).catch(cb)
       },
-      predestroy () {
+      predestroy() {
         destroy = ite.return()
       },
-      destroy (cb) {
+      destroy(cb) {
         if (!destroy) return cb(null)
         destroy.then(cb.bind(null, null)).catch(cb)
       }
@@ -37334,13 +37688,13 @@ class Readable extends Stream {
 
     return rs
 
-    function push (data) {
+    function push(data) {
       if (data.done) rs.push(null)
       else rs.push(data.value)
     }
   }
 
-  static from (data, opts) {
+  static from(data, opts) {
     if (isReadStreamx(data)) return data
     if (data[asyncIterator]) return this._fromAsyncIterator(data[asyncIterator](), opts)
     if (!Array.isArray(data)) data = data === undefined ? [] : [data]
@@ -37348,37 +37702,42 @@ class Readable extends Stream {
     let i = 0
     return new Readable({
       ...opts,
-      read (cb) {
+      read(cb) {
         this.push(i === data.length ? null : data[i++])
         cb(null)
       }
     })
   }
 
-  static isBackpressured (rs) {
-    return (rs._duplexState & READ_BACKPRESSURE_STATUS) !== 0 || rs._readableState.buffered >= rs._readableState.highWaterMark
+  static isBackpressured(rs) {
+    return (
+      (rs._duplexState & READ_BACKPRESSURE_STATUS) !== 0 ||
+      rs._readableState.buffered >= rs._readableState.highWaterMark
+    )
   }
 
-  static isPaused (rs) {
+  static isPaused(rs) {
     return (rs._duplexState & READ_RESUMED) === 0
   }
 
-  [asyncIterator] () {
+  [asyncIterator]() {
     const stream = this
 
     let error = null
     let promiseResolve = null
     let promiseReject = null
 
-    this.on('error', (err) => { error = err })
+    this.on('error', (err) => {
+      error = err
+    })
     this.on('readable', onreadable)
     this.on('close', onclose)
 
     return {
-      [asyncIterator] () {
+      [asyncIterator]() {
         return this
       },
-      next () {
+      next() {
         return new Promise(function (resolve, reject) {
           promiseResolve = resolve
           promiseReject = reject
@@ -37387,31 +37746,35 @@ class Readable extends Stream {
           else if ((stream._duplexState & DESTROYED) !== 0) ondata(null)
         })
       },
-      return () {
+      return() {
         return destroy(null)
       },
-      throw (err) {
+      throw(err) {
         return destroy(err)
       }
     }
 
-    function onreadable () {
+    function onreadable() {
       if (promiseResolve !== null) ondata(stream.read())
     }
 
-    function onclose () {
+    function onclose() {
       if (promiseResolve !== null) ondata(null)
     }
 
-    function ondata (data) {
+    function ondata(data) {
       if (promiseReject === null) return
-      if (error) promiseReject(error)
-      else if (data === null && (stream._duplexState & READ_DONE) === 0) promiseReject(STREAM_DESTROYED)
-      else promiseResolve({ value: data, done: data === null })
+      if (error) {
+        promiseReject(error)
+      } else if (data === null && (stream._duplexState & READ_DONE) === 0) {
+        promiseReject(StreamError.STREAM_DESTROYED())
+      } else {
+        promiseResolve({ value: data, done: data === null })
+      }
       promiseReject = promiseResolve = null
     }
 
-    function destroy (err) {
+    function destroy(err) {
       stream.destroy(err)
       return new Promise((resolve, reject) => {
         if (stream._duplexState & DESTROYED) return resolve({ value: undefined, done: true })
@@ -37425,7 +37788,7 @@ class Readable extends Stream {
 }
 
 class Writable extends Stream {
-  constructor (opts) {
+  constructor(opts) {
     super(opts)
 
     this._duplexState |= OPENING | READ_DONE
@@ -37439,48 +37802,60 @@ class Writable extends Stream {
     }
   }
 
-  _writev (batch, cb) {
+  cork() {
+    this._duplexState |= WRITE_CORKED
+  }
+
+  uncork() {
+    this._duplexState &= WRITE_NOT_CORKED
+    this._writableState.updateNextTick()
+  }
+
+  _writev(batch, cb) {
     cb(null)
   }
 
-  _write (data, cb) {
+  _write(data, cb) {
     this._writableState.autoBatch(data, cb)
   }
 
-  _final (cb) {
+  _final(cb) {
     cb(null)
   }
 
-  static isBackpressured (ws) {
+  static isBackpressured(ws) {
     return (ws._duplexState & WRITE_BACKPRESSURE_STATUS) !== 0
   }
 
-  static drained (ws) {
+  static drained(ws) {
     if (ws.destroyed) return Promise.resolve(false)
+
     const state = ws._writableState
-    const pending = (isWritev(ws) ? Math.min(1, state.queue.length) : state.queue.length)
-    const writes = pending + ((ws._duplexState & WRITE_WRITING) ? 1 : 0)
+    const pending = isWritev(ws) ? Math.min(1, state.queue.length) : state.queue.length
+    const writes = pending + (ws._duplexState & WRITE_WRITING ? 1 : 0)
     if (writes === 0) return Promise.resolve(true)
+
     if (state.drains === null) state.drains = []
     return new Promise((resolve) => {
       state.drains.push({ writes, resolve })
     })
   }
 
-  write (data) {
+  write(data) {
     this._writableState.updateNextTick()
     return this._writableState.push(data)
   }
 
-  end (data) {
+  end(data) {
     this._writableState.updateNextTick()
     this._writableState.end(data)
     return this
   }
 }
 
-class Duplex extends Readable { // and Writable
-  constructor (opts) {
+class Duplex extends Readable {
+  // and Writable
+  constructor(opts) {
     super(opts)
 
     this._duplexState = OPENING | (this._duplexState & READ_READ_AHEAD)
@@ -37493,24 +37868,33 @@ class Duplex extends Readable { // and Writable
     }
   }
 
-  _writev (batch, cb) {
+  cork() {
+    this._duplexState |= WRITE_CORKED
+  }
+
+  uncork() {
+    this._duplexState &= WRITE_NOT_CORKED
+    this._writableState.updateNextTick()
+  }
+
+  _writev(batch, cb) {
     cb(null)
   }
 
-  _write (data, cb) {
+  _write(data, cb) {
     this._writableState.autoBatch(data, cb)
   }
 
-  _final (cb) {
+  _final(cb) {
     cb(null)
   }
 
-  write (data) {
+  write(data) {
     this._writableState.updateNextTick()
     return this._writableState.push(data)
   }
 
-  end (data) {
+  end(data) {
     this._writableState.updateNextTick()
     this._writableState.end(data)
     return this
@@ -37518,7 +37902,7 @@ class Duplex extends Readable { // and Writable
 }
 
 class Transform extends Duplex {
-  constructor (opts) {
+  constructor(opts) {
     super(opts)
     this._transformState = new TransformState(this)
 
@@ -37528,7 +37912,7 @@ class Transform extends Duplex {
     }
   }
 
-  _write (data, cb) {
+  _write(data, cb) {
     if (this._readableState.buffered >= this._readableState.highWaterMark) {
       this._transformState.data = data
     } else {
@@ -37536,7 +37920,7 @@ class Transform extends Duplex {
     }
   }
 
-  _read (cb) {
+  _read(cb) {
     if (this._transformState.data !== null) {
       const data = this._transformState.data
       this._transformState.data = null
@@ -37547,7 +37931,7 @@ class Transform extends Duplex {
     }
   }
 
-  destroy (err) {
+  destroy(err) {
     super.destroy(err)
     if (this._transformState.data !== null) {
       this._transformState.data = null
@@ -37555,15 +37939,15 @@ class Transform extends Duplex {
     }
   }
 
-  _transform (data, cb) {
+  _transform(data, cb) {
     cb(null, data)
   }
 
-  _flush (cb) {
+  _flush(cb) {
     cb(null)
   }
 
-  _final (cb) {
+  _final(cb) {
     this._transformState.afterFinal = cb
     this._flush(transformAfterFlush.bind(this))
   }
@@ -37571,15 +37955,16 @@ class Transform extends Duplex {
 
 class PassThrough extends Transform {}
 
-function transformAfterFlush (err, data) {
+function transformAfterFlush(err, data) {
   const cb = this._transformState.afterFinal
   if (err) return cb(err)
+
   if (data !== null && data !== undefined) this.push(data)
   this.push(null)
   cb(null)
 }
 
-function pipelinePromise (...streams) {
+function pipelinePromise(...streams) {
   return new Promise((resolve, reject) => {
     return pipeline(...streams, (err) => {
       if (err) return reject(err)
@@ -37588,11 +37973,11 @@ function pipelinePromise (...streams) {
   })
 }
 
-function pipeline (stream, ...streams) {
+function pipeline(stream, ...streams) {
   const all = Array.isArray(stream) ? [...stream, ...streams] : [stream, ...streams]
-  const done = (all.length && typeof all[all.length - 1] === 'function') ? all.pop() : null
+  const done = all.length && typeof all[all.length - 1] === 'function' ? all.pop() : null
 
-  if (all.length < 2) throw new Error('Pipeline requires at least 2 streams')
+  if (all.length < 2) throw StreamError.BAD_ARGUMENT('Pipeline requires at least 2 streams')
 
   let src = all[0]
   let dest = null
@@ -37614,7 +37999,8 @@ function pipeline (stream, ...streams) {
   if (done) {
     let fin = false
 
-    const autoDestroy = isStreamx(dest) || !!(dest._writableState && dest._writableState.autoDestroy)
+    const autoDestroy =
+      isStreamx(dest) || !!(dest._writableState && dest._writableState.autoDestroy)
 
     dest.on('error', (err) => {
       if (error === null) error = err
@@ -37626,23 +38012,27 @@ function pipeline (stream, ...streams) {
     })
 
     if (autoDestroy) {
-      dest.on('close', () => done(error || (fin ? null : PREMATURE_CLOSE)))
+      dest.on('close', () => done(error || (fin ? null : StreamError.PREMATURE_CLOSE())))
     }
   }
 
   return dest
 
-  function errorHandle (s, rd, wr, onerror) {
+  function errorHandle(s, rd, wr, onerror) {
     s.on('error', onerror)
     s.on('close', onclose)
 
-    function onclose () {
-      if (rd && s._readableState && !s._readableState.ended) return onerror(PREMATURE_CLOSE)
-      if (wr && s._writableState && !s._writableState.ended) return onerror(PREMATURE_CLOSE)
+    function onclose() {
+      if (rd && s._readableState && !s._readableState.ended) {
+        return onerror(StreamError.PREMATURE_CLOSE())
+      }
+      if (wr && s._writableState && !s._writableState.ended) {
+        return onerror(StreamError.PREMATURE_CLOSE())
+      }
     }
   }
 
-  function onerror (err) {
+  function onerror(err) {
     if (!err || error) return
     error = err
 
@@ -37652,38 +38042,70 @@ function pipeline (stream, ...streams) {
   }
 }
 
-function isStream (stream) {
+function echo(s) {
+  return s
+}
+
+function isStream(stream) {
   return !!stream._readableState || !!stream._writableState
 }
 
-function isStreamx (stream) {
+function isStreamx(stream) {
   return typeof stream._duplexState === 'number' && isStream(stream)
 }
 
-function getStreamError (stream) {
-  const err = (stream._readableState && stream._readableState.error) || (stream._writableState && stream._writableState.error)
-  return err === STREAM_DESTROYED ? null : err // only explicit errors
+function isEnding(stream) {
+  return !!stream._readableState && stream._readableState.ending
 }
 
-function isReadStreamx (stream) {
+function isEnded(stream) {
+  return !!stream._readableState && stream._readableState.ended
+}
+
+function isFinishing(stream) {
+  return !!stream._writableState && stream._writableState.ending
+}
+
+function isFinished(stream) {
+  return !!stream._writableState && stream._writableState.ended
+}
+
+function getStreamError(stream, opts = {}) {
+  const err =
+    (stream._readableState && stream._readableState.error) ||
+    (stream._writableState && stream._writableState.error)
+
+  // avoid implicit errors by default
+  return !opts.all && StreamError.isStreamDestroyed(err) ? null : err
+}
+
+function isReadStreamx(stream) {
   return isStreamx(stream) && stream.readable
 }
 
-function isTypedArray (data) {
+function isDisturbed(stream) {
+  return (
+    (stream._duplexState & OPENING) !== OPENING ||
+    (stream._duplexState & DESTROYING) === DESTROYING ||
+    (stream._duplexState & ACTIVE_OR_TICKING) !== 0
+  )
+}
+
+function isTypedArray(data) {
   return typeof data === 'object' && data !== null && typeof data.byteLength === 'number'
 }
 
-function defaultByteLength (data) {
+function defaultByteLength(data) {
   return isTypedArray(data) ? data.byteLength : 1024
 }
 
-function noop () {}
+function noop() {}
 
-function abort () {
-  this.destroy(new Error('Stream aborted.'))
+function abort() {
+  this.destroy(StreamError.ABORTED())
 }
 
-function isWritev (s) {
+function isWritev(s) {
   return s._writev !== Writable.prototype._writev && s._writev !== Duplex.prototype._writev
 }
 
@@ -37692,6 +38114,11 @@ module.exports = {
   pipelinePromise,
   isStream,
   isStreamx,
+  isEnding,
+  isEnded,
+  isFinishing,
+  isFinished,
+  isDisturbed,
   getStreamError,
   Stream,
   Writable,
@@ -37702,6 +38129,363 @@ module.exports = {
   PassThrough
 }
 
+
+/***/ }),
+
+/***/ 5657:
+/***/ ((module) => {
+
+module.exports = class StreamError extends Error {
+  constructor(msg, code, fn = StreamError) {
+    super(msg)
+
+    this.code = code
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, fn)
+    }
+  }
+
+  static isStreamDestroyed(err) {
+    return err && err.code === 'STREAM_DESTROYED'
+  }
+
+  static isPrematureClose(err) {
+    return err && err.code === 'PREMATURE_CLOSE'
+  }
+
+  static isAborted(err) {
+    return err && err.code === 'ABORTED'
+  }
+
+  static isBadArgument(err) {
+    return err && err.code === 'BAD_ARGUMENT'
+  }
+
+  get name() {
+    return 'StreamError'
+  }
+
+  static STREAM_DESTROYED() {
+    return new StreamError('Stream was destroyed', 'STREAM_DESTROYED', StreamError.STREAM_DESTROYED)
+  }
+
+  static PREMATURE_CLOSE(msg = 'Premature close') {
+    return new StreamError(msg, 'PREMATURE_CLOSE', StreamError.PREMATURE_CLOSE)
+  }
+
+  static ABORTED() {
+    return new StreamError('Stream aborted', 'ABORTED', StreamError.ABORTED)
+  }
+
+  static BAD_ARGUMENT(msg = 'Bad argument') {
+    return new StreamError(msg, 'BAD_ARGUMENT', StreamError.BAD_ARGUMENT)
+  }
+}
+
+
+/***/ }),
+
+/***/ 634:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+
+/*<replacement>*/
+
+var Buffer = (__nccwpck_require__(3058).Buffer);
+/*</replacement>*/
+
+var isEncoding = Buffer.isEncoding || function (encoding) {
+  encoding = '' + encoding;
+  switch (encoding && encoding.toLowerCase()) {
+    case 'hex':case 'utf8':case 'utf-8':case 'ascii':case 'binary':case 'base64':case 'ucs2':case 'ucs-2':case 'utf16le':case 'utf-16le':case 'raw':
+      return true;
+    default:
+      return false;
+  }
+};
+
+function _normalizeEncoding(enc) {
+  if (!enc) return 'utf8';
+  var retried;
+  while (true) {
+    switch (enc) {
+      case 'utf8':
+      case 'utf-8':
+        return 'utf8';
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return 'utf16le';
+      case 'latin1':
+      case 'binary':
+        return 'latin1';
+      case 'base64':
+      case 'ascii':
+      case 'hex':
+        return enc;
+      default:
+        if (retried) return; // undefined
+        enc = ('' + enc).toLowerCase();
+        retried = true;
+    }
+  }
+};
+
+// Do not cache `Buffer.isEncoding` when checking encoding names as some
+// modules monkey-patch it to support additional encodings
+function normalizeEncoding(enc) {
+  var nenc = _normalizeEncoding(enc);
+  if (typeof nenc !== 'string' && (Buffer.isEncoding === isEncoding || !isEncoding(enc))) throw new Error('Unknown encoding: ' + enc);
+  return nenc || enc;
+}
+
+// StringDecoder provides an interface for efficiently splitting a series of
+// buffers into a series of JS strings without breaking apart multi-byte
+// characters.
+exports.StringDecoder = StringDecoder;
+function StringDecoder(encoding) {
+  this.encoding = normalizeEncoding(encoding);
+  var nb;
+  switch (this.encoding) {
+    case 'utf16le':
+      this.text = utf16Text;
+      this.end = utf16End;
+      nb = 4;
+      break;
+    case 'utf8':
+      this.fillLast = utf8FillLast;
+      nb = 4;
+      break;
+    case 'base64':
+      this.text = base64Text;
+      this.end = base64End;
+      nb = 3;
+      break;
+    default:
+      this.write = simpleWrite;
+      this.end = simpleEnd;
+      return;
+  }
+  this.lastNeed = 0;
+  this.lastTotal = 0;
+  this.lastChar = Buffer.allocUnsafe(nb);
+}
+
+StringDecoder.prototype.write = function (buf) {
+  if (buf.length === 0) return '';
+  var r;
+  var i;
+  if (this.lastNeed) {
+    r = this.fillLast(buf);
+    if (r === undefined) return '';
+    i = this.lastNeed;
+    this.lastNeed = 0;
+  } else {
+    i = 0;
+  }
+  if (i < buf.length) return r ? r + this.text(buf, i) : this.text(buf, i);
+  return r || '';
+};
+
+StringDecoder.prototype.end = utf8End;
+
+// Returns only complete characters in a Buffer
+StringDecoder.prototype.text = utf8Text;
+
+// Attempts to complete a partial non-UTF-8 character using bytes from a Buffer
+StringDecoder.prototype.fillLast = function (buf) {
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, buf.length);
+  this.lastNeed -= buf.length;
+};
+
+// Checks the type of a UTF-8 byte, whether it's ASCII, a leading byte, or a
+// continuation byte. If an invalid byte is detected, -2 is returned.
+function utf8CheckByte(byte) {
+  if (byte <= 0x7F) return 0;else if (byte >> 5 === 0x06) return 2;else if (byte >> 4 === 0x0E) return 3;else if (byte >> 3 === 0x1E) return 4;
+  return byte >> 6 === 0x02 ? -1 : -2;
+}
+
+// Checks at most 3 bytes at the end of a Buffer in order to detect an
+// incomplete multi-byte UTF-8 character. The total number of bytes (2, 3, or 4)
+// needed to complete the UTF-8 character (if applicable) are returned.
+function utf8CheckIncomplete(self, buf, i) {
+  var j = buf.length - 1;
+  if (j < i) return 0;
+  var nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 1;
+    return nb;
+  }
+  if (--j < i || nb === -2) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 2;
+    return nb;
+  }
+  if (--j < i || nb === -2) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) {
+      if (nb === 2) nb = 0;else self.lastNeed = nb - 3;
+    }
+    return nb;
+  }
+  return 0;
+}
+
+// Validates as many continuation bytes for a multi-byte UTF-8 character as
+// needed or are available. If we see a non-continuation byte where we expect
+// one, we "replace" the validated continuation bytes we've seen so far with
+// a single UTF-8 replacement character ('\ufffd'), to match v8's UTF-8 decoding
+// behavior. The continuation byte check is included three times in the case
+// where all of the continuation bytes for a character exist in the same buffer.
+// It is also done this way as a slight performance increase instead of using a
+// loop.
+function utf8CheckExtraBytes(self, buf, p) {
+  if ((buf[0] & 0xC0) !== 0x80) {
+    self.lastNeed = 0;
+    return '\ufffd';
+  }
+  if (self.lastNeed > 1 && buf.length > 1) {
+    if ((buf[1] & 0xC0) !== 0x80) {
+      self.lastNeed = 1;
+      return '\ufffd';
+    }
+    if (self.lastNeed > 2 && buf.length > 2) {
+      if ((buf[2] & 0xC0) !== 0x80) {
+        self.lastNeed = 2;
+        return '\ufffd';
+      }
+    }
+  }
+}
+
+// Attempts to complete a multi-byte UTF-8 character using bytes from a Buffer.
+function utf8FillLast(buf) {
+  var p = this.lastTotal - this.lastNeed;
+  var r = utf8CheckExtraBytes(this, buf, p);
+  if (r !== undefined) return r;
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, p, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, p, 0, buf.length);
+  this.lastNeed -= buf.length;
+}
+
+// Returns all complete UTF-8 characters in a Buffer. If the Buffer ended on a
+// partial character, the character's bytes are buffered until the required
+// number of bytes are available.
+function utf8Text(buf, i) {
+  var total = utf8CheckIncomplete(this, buf, i);
+  if (!this.lastNeed) return buf.toString('utf8', i);
+  this.lastTotal = total;
+  var end = buf.length - (total - this.lastNeed);
+  buf.copy(this.lastChar, 0, end);
+  return buf.toString('utf8', i, end);
+}
+
+// For UTF-8, a replacement character is added when ending on a partial
+// character.
+function utf8End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + '\ufffd';
+  return r;
+}
+
+// UTF-16LE typically needs two bytes per character, but even if we have an even
+// number of bytes available, we need to check if we end on a leading/high
+// surrogate. In that case, we need to wait for the next two bytes in order to
+// decode the last character properly.
+function utf16Text(buf, i) {
+  if ((buf.length - i) % 2 === 0) {
+    var r = buf.toString('utf16le', i);
+    if (r) {
+      var c = r.charCodeAt(r.length - 1);
+      if (c >= 0xD800 && c <= 0xDBFF) {
+        this.lastNeed = 2;
+        this.lastTotal = 4;
+        this.lastChar[0] = buf[buf.length - 2];
+        this.lastChar[1] = buf[buf.length - 1];
+        return r.slice(0, -1);
+      }
+    }
+    return r;
+  }
+  this.lastNeed = 1;
+  this.lastTotal = 2;
+  this.lastChar[0] = buf[buf.length - 1];
+  return buf.toString('utf16le', i, buf.length - 1);
+}
+
+// For UTF-16LE we do not explicitly append special replacement characters if we
+// end on a partial character, we simply let v8 handle that.
+function utf16End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) {
+    var end = this.lastTotal - this.lastNeed;
+    return r + this.lastChar.toString('utf16le', 0, end);
+  }
+  return r;
+}
+
+function base64Text(buf, i) {
+  var n = (buf.length - i) % 3;
+  if (n === 0) return buf.toString('base64', i);
+  this.lastNeed = 3 - n;
+  this.lastTotal = 3;
+  if (n === 1) {
+    this.lastChar[0] = buf[buf.length - 1];
+  } else {
+    this.lastChar[0] = buf[buf.length - 2];
+    this.lastChar[1] = buf[buf.length - 1];
+  }
+  return buf.toString('base64', i, buf.length - n);
+}
+
+function base64End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + this.lastChar.toString('base64', 0, 3 - this.lastNeed);
+  return r;
+}
+
+// Pass bytes on through for single-byte encodings (e.g. ascii, latin1, hex)
+function simpleWrite(buf) {
+  return buf.toString(this.encoding);
+}
+
+function simpleEnd(buf) {
+  return buf && buf.length ? this.write(buf) : '';
+}
 
 /***/ }),
 
@@ -37878,6 +38662,7 @@ const b4a = __nccwpck_require__(3057)
 const headers = __nccwpck_require__(8428)
 
 const EMPTY = b4a.alloc(0)
+const MAX_HEADER_SIZE = 4 * 1024 * 1024 // arbitrary big number
 
 class BufferList {
   constructor () {
@@ -37894,7 +38679,7 @@ class BufferList {
   }
 
   shiftFirst (size) {
-    return this._buffered === 0 ? null : this._next(size)
+    return this.buffered === 0 ? null : this._next(size)
   }
 
   shift (size) {
@@ -38023,6 +38808,8 @@ class Extract extends Writable {
 
     if (!this._header) return true
 
+    this._header.byteOffset = this._buffer.shifted
+
     switch (this._header.type) {
       case 'gnu-long-path':
       case 'gnu-long-link-path':
@@ -38030,11 +38817,20 @@ class Extract extends Writable {
       case 'pax-header':
         this._longHeader = true
         this._missing = this._header.size
+        if (this._missing > MAX_HEADER_SIZE) {
+          this._continueWrite(new Error('Header exceeds max size'))
+          return false
+        }
         return true
     }
 
     this._locked = true
     this._applyLongHeaders()
+
+    if (!(this._header.size >= 0)) {
+      this._continueWrite(new Error('Invalid header'))
+      return false
+    }
 
     if (this._header.size === 0 || this._header.type === 'directory') {
       this.emit('entry', this._header, this._createStream(), this._unlockBound)
@@ -38424,6 +39220,7 @@ exports.decode = function decode (buf, filenameEncoding, allowUnknownFormat) {
     uid,
     gid,
     size,
+    byteOffset: 0,
     mtime: new Date(1000 * mtime),
     type,
     linkname,
@@ -38908,6 +39705,295 @@ function overflow (self, size) {
 
 function mapWritable (buf) {
   return b4a.isBuffer(buf) ? buf : b4a.from(buf)
+}
+
+
+/***/ }),
+
+/***/ 7934:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const PassThroughDecoder = __nccwpck_require__(7256)
+const UTF8Decoder = __nccwpck_require__(6414)
+
+module.exports = class TextDecoder {
+  constructor(encoding = 'utf8') {
+    this.encoding = normalizeEncoding(encoding)
+
+    switch (this.encoding) {
+      case 'utf8':
+        this.decoder = new UTF8Decoder()
+        break
+      case 'utf16le':
+      case 'base64':
+        throw new Error('Unsupported encoding: ' + this.encoding)
+      default:
+        this.decoder = new PassThroughDecoder(this.encoding)
+    }
+  }
+
+  get remaining() {
+    return this.decoder.remaining
+  }
+
+  push(data) {
+    if (typeof data === 'string') return data
+    return this.decoder.decode(data)
+  }
+
+  // For Node.js compatibility
+  write(data) {
+    return this.push(data)
+  }
+
+  end(data) {
+    let result = ''
+    if (data) result = this.push(data)
+    result += this.decoder.flush()
+    return result
+  }
+}
+
+function normalizeEncoding(encoding) {
+  encoding = encoding.toLowerCase()
+
+  switch (encoding) {
+    case 'utf8':
+    case 'utf-8':
+      return 'utf8'
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return 'utf16le'
+    case 'latin1':
+    case 'binary':
+      return 'latin1'
+    case 'base64':
+    case 'ascii':
+    case 'hex':
+      return encoding
+    default:
+      throw new Error('Unknown encoding: ' + encoding)
+  }
+}
+
+
+/***/ }),
+
+/***/ 7256:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const b4a = __nccwpck_require__(3057)
+
+module.exports = class PassThroughDecoder {
+  constructor(encoding) {
+    this.encoding = encoding
+  }
+
+  get remaining() {
+    return 0
+  }
+
+  decode(data) {
+    return b4a.toString(data, this.encoding)
+  }
+
+  flush() {
+    return ''
+  }
+}
+
+
+/***/ }),
+
+/***/ 6414:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const b4a = __nccwpck_require__(3057)
+
+/**
+ * https://encoding.spec.whatwg.org/#utf-8-decoder
+ */
+module.exports = class UTF8Decoder {
+  constructor() {
+    this._reset()
+  }
+
+  get remaining() {
+    return this.bytesSeen
+  }
+
+  decode(data) {
+    if (data.byteLength === 0) return ''
+
+    if (this.bytesNeeded === 0 && trailingIncomplete(data, 0) === 0) {
+      this.bytesSeen = trailingBytesSeen(data)
+      return b4a.toString(data, 'utf8')
+    }
+
+    let result = ''
+    let start = 0
+
+    if (this.bytesNeeded > 0) {
+      while (start < data.byteLength) {
+        const byte = data[start]
+
+        if (byte < this.lowerBoundary || byte > this.upperBoundary) {
+          result += '\ufffd'
+          this._reset()
+          break
+        }
+
+        this.lowerBoundary = 0x80
+        this.upperBoundary = 0xbf
+        this.codePoint = (this.codePoint << 6) | (byte & 0x3f)
+        this.bytesSeen++
+        start++
+
+        if (this.bytesSeen === this.bytesNeeded) {
+          result += String.fromCodePoint(this.codePoint)
+          this._reset()
+          break
+        }
+      }
+
+      if (this.bytesNeeded > 0) return result
+    }
+
+    const trailing = trailingIncomplete(data, start)
+    const end = data.byteLength - trailing
+
+    if (end > start) result += b4a.toString(data, 'utf8', start, end)
+
+    for (let i = end; i < data.byteLength; i++) {
+      const byte = data[i]
+
+      if (this.bytesNeeded === 0) {
+        if (byte <= 0x7f) {
+          this.bytesSeen = 0
+          result += String.fromCharCode(byte)
+        } else if (byte >= 0xc2 && byte <= 0xdf) {
+          this.bytesNeeded = 2
+          this.bytesSeen = 1
+          this.codePoint = byte & 0x1f
+        } else if (byte >= 0xe0 && byte <= 0xef) {
+          if (byte === 0xe0) this.lowerBoundary = 0xa0
+          else if (byte === 0xed) this.upperBoundary = 0x9f
+          this.bytesNeeded = 3
+          this.bytesSeen = 1
+          this.codePoint = byte & 0xf
+        } else if (byte >= 0xf0 && byte <= 0xf4) {
+          if (byte === 0xf0) this.lowerBoundary = 0x90
+          else if (byte === 0xf4) this.upperBoundary = 0x8f
+          this.bytesNeeded = 4
+          this.bytesSeen = 1
+          this.codePoint = byte & 0x7
+        } else {
+          this.bytesSeen = 1
+          result += '\ufffd'
+        }
+
+        continue
+      }
+
+      if (byte < this.lowerBoundary || byte > this.upperBoundary) {
+        result += '\ufffd'
+        i--
+        this._reset()
+
+        continue
+      }
+
+      this.lowerBoundary = 0x80
+      this.upperBoundary = 0xbf
+
+      this.codePoint = (this.codePoint << 6) | (byte & 0x3f)
+      this.bytesSeen++
+
+      if (this.bytesSeen === this.bytesNeeded) {
+        result += String.fromCodePoint(this.codePoint)
+        this._reset()
+      }
+    }
+
+    return result
+  }
+
+  flush() {
+    const result = this.bytesNeeded > 0 ? '\ufffd' : ''
+    this._reset()
+    return result
+  }
+
+  _reset() {
+    this.codePoint = 0
+    this.bytesNeeded = 0
+    this.bytesSeen = 0
+    this.lowerBoundary = 0x80
+    this.upperBoundary = 0xbf
+  }
+}
+
+function trailingIncomplete(data, start) {
+  const len = data.byteLength
+  if (len <= start) return 0
+
+  const limit = Math.max(start, len - 4)
+
+  let i = len - 1
+  while (i > limit && (data[i] & 0xc0) === 0x80) i--
+
+  if (i < start) return 0
+
+  const byte = data[i]
+
+  let needed
+  if (byte <= 0x7f) return 0
+  if (byte >= 0xc2 && byte <= 0xdf) needed = 2
+  else if (byte >= 0xe0 && byte <= 0xef) needed = 3
+  else if (byte >= 0xf0 && byte <= 0xf4) needed = 4
+  else return 0
+
+  const available = len - i
+  return available < needed ? available : 0
+}
+
+function trailingBytesSeen(data) {
+  const len = data.byteLength
+  if (len === 0) return 0
+
+  const last = data[len - 1]
+
+  if (last <= 0x7f) return 0
+  if ((last & 0xc0) !== 0x80) return 1
+
+  const limit = Math.max(0, len - 4)
+
+  let i = len - 2
+  while (i >= limit && (data[i] & 0xc0) === 0x80) i--
+
+  if (i < 0) return 1
+
+  const first = data[i]
+
+  let needed
+  if (first >= 0xc2 && first <= 0xdf) needed = 2
+  else if (first >= 0xe0 && first <= 0xef) needed = 3
+  else if (first >= 0xf0 && first <= 0xf4) needed = 4
+  else return 1
+
+  if (len - i !== needed) return 1
+
+  if (needed >= 3) {
+    const second = data[i + 1]
+    if (first === 0xe0 && second < 0xa0) return 1
+    if (first === 0xed && second > 0x9f) return 1
+    if (first === 0xf0 && second < 0x90) return 1
+    if (first === 0xf4 && second > 0x8f) return 1
+  }
+
+  return 0
 }
 
 
@@ -73173,18 +74259,18 @@ module.exports = require("zlib");
 
 /***/ }),
 
-/***/ 8669:
+/***/ 2981:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Glob = void 0;
-const minimatch_1 = __nccwpck_require__(2883);
+const minimatch_1 = __nccwpck_require__(6507);
 const node_url_1 = __nccwpck_require__(3136);
 const path_scurry_1 = __nccwpck_require__(8958);
-const pattern_js_1 = __nccwpck_require__(4410);
-const walker_js_1 = __nccwpck_require__(3581);
+const pattern_js_1 = __nccwpck_require__(7813);
+const walker_js_1 = __nccwpck_require__(1157);
 // if no process global, just call it linux.
 // so we default to case-sensitive, / separators
 const defaultPlatform = (typeof process === 'object' &&
@@ -73427,14 +74513,14 @@ exports.Glob = Glob;
 
 /***/ }),
 
-/***/ 3413:
+/***/ 5197:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.hasMagic = void 0;
-const minimatch_1 = __nccwpck_require__(2883);
+const minimatch_1 = __nccwpck_require__(6507);
 /**
  * Return true if the patterns provided contain any magic glob characters,
  * given the options provided.
@@ -73461,7 +74547,7 @@ exports.hasMagic = hasMagic;
 
 /***/ }),
 
-/***/ 4941:
+/***/ 5637:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -73472,8 +74558,8 @@ exports.hasMagic = hasMagic;
 // Ignores are always parsed in dot:true mode
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Ignore = void 0;
-const minimatch_1 = __nccwpck_require__(2883);
-const pattern_js_1 = __nccwpck_require__(4410);
+const minimatch_1 = __nccwpck_require__(6507);
+const pattern_js_1 = __nccwpck_require__(7813);
 const defaultPlatform = (typeof process === 'object' &&
     process &&
     typeof process.platform === 'string') ?
@@ -73587,7 +74673,7 @@ exports.Ignore = Ignore;
 
 /***/ }),
 
-/***/ 6171:
+/***/ 1363:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -73599,17 +74685,17 @@ exports.globStream = globStream;
 exports.globSync = globSync;
 exports.globIterateSync = globIterateSync;
 exports.globIterate = globIterate;
-const minimatch_1 = __nccwpck_require__(2883);
-const glob_js_1 = __nccwpck_require__(8669);
-const has_magic_js_1 = __nccwpck_require__(3413);
-var minimatch_2 = __nccwpck_require__(2883);
+const minimatch_1 = __nccwpck_require__(6507);
+const glob_js_1 = __nccwpck_require__(2981);
+const has_magic_js_1 = __nccwpck_require__(5197);
+var minimatch_2 = __nccwpck_require__(6507);
 Object.defineProperty(exports, "escape", ({ enumerable: true, get: function () { return minimatch_2.escape; } }));
 Object.defineProperty(exports, "unescape", ({ enumerable: true, get: function () { return minimatch_2.unescape; } }));
-var glob_js_2 = __nccwpck_require__(8669);
+var glob_js_2 = __nccwpck_require__(2981);
 Object.defineProperty(exports, "Glob", ({ enumerable: true, get: function () { return glob_js_2.Glob; } }));
-var has_magic_js_2 = __nccwpck_require__(3413);
+var has_magic_js_2 = __nccwpck_require__(5197);
 Object.defineProperty(exports, "hasMagic", ({ enumerable: true, get: function () { return has_magic_js_2.hasMagic; } }));
-var ignore_js_1 = __nccwpck_require__(4941);
+var ignore_js_1 = __nccwpck_require__(5637);
 Object.defineProperty(exports, "Ignore", ({ enumerable: true, get: function () { return ignore_js_1.Ignore; } }));
 function globStreamSync(pattern, options = {}) {
     return new glob_js_1.Glob(pattern, options).streamSync();
@@ -73662,7 +74748,7 @@ exports.glob.glob = exports.glob;
 
 /***/ }),
 
-/***/ 4410:
+/***/ 7813:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -73670,7 +74756,7 @@ exports.glob.glob = exports.glob;
 // this is just a very light wrapper around 2 arrays with an offset index
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Pattern = void 0;
-const minimatch_1 = __nccwpck_require__(2883);
+const minimatch_1 = __nccwpck_require__(6507);
 const isPatternList = (pl) => pl.length >= 1;
 const isGlobList = (gl) => gl.length >= 1;
 /**
@@ -73888,7 +74974,7 @@ exports.Pattern = Pattern;
 
 /***/ }),
 
-/***/ 4827:
+/***/ 7843:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -73896,7 +74982,7 @@ exports.Pattern = Pattern;
 // synchronous utility for filtering entries and calculating subwalks
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Processor = exports.SubWalks = exports.MatchRecord = exports.HasWalkedCache = void 0;
-const minimatch_1 = __nccwpck_require__(2883);
+const minimatch_1 = __nccwpck_require__(6507);
 /**
  * A cache of which patterns have been processed for a given Path
  */
@@ -74196,7 +75282,7 @@ exports.Processor = Processor;
 
 /***/ }),
 
-/***/ 3581:
+/***/ 1157:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -74210,8 +75296,8 @@ exports.GlobStream = exports.GlobWalker = exports.GlobUtil = void 0;
  * @module
  */
 const minipass_1 = __nccwpck_require__(8275);
-const ignore_js_1 = __nccwpck_require__(4941);
-const processor_js_1 = __nccwpck_require__(4827);
+const ignore_js_1 = __nccwpck_require__(5637);
+const processor_js_1 = __nccwpck_require__(7843);
 const makeIgnore = (ignore, opts) => typeof ignore === 'string' ? new ignore_js_1.Ignore([ignore], opts)
     : Array.isArray(ignore) ? new ignore_js_1.Ignore(ignore, opts)
         : ignore;
@@ -74590,7 +75676,7 @@ exports.GlobStream = GlobStream;
 
 /***/ }),
 
-/***/ 6177:
+/***/ 7305:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -74611,7 +75697,7 @@ exports.assertValidPattern = assertValidPattern;
 
 /***/ }),
 
-/***/ 2275:
+/***/ 1803:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -74620,8 +75706,8 @@ exports.assertValidPattern = assertValidPattern;
 var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AST = void 0;
-const brace_expressions_js_1 = __nccwpck_require__(570);
-const unescape_js_1 = __nccwpck_require__(8075);
+const brace_expressions_js_1 = __nccwpck_require__(1090);
+const unescape_js_1 = __nccwpck_require__(851);
 const types = new Set(['!', '?', '+', '*', '@']);
 const isExtglobType = (c) => types.has(c);
 const isExtglobAST = (c) => isExtglobType(c.type);
@@ -75365,7 +76451,7 @@ _a = AST;
 
 /***/ }),
 
-/***/ 570:
+/***/ 1090:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -75524,7 +76610,7 @@ exports.parseClass = parseClass;
 
 /***/ }),
 
-/***/ 2600:
+/***/ 800:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -75553,7 +76639,7 @@ exports.escape = escape;
 
 /***/ }),
 
-/***/ 2883:
+/***/ 6507:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -75563,11 +76649,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.unescape = exports.escape = exports.AST = exports.Minimatch = exports.match = exports.makeRe = exports.braceExpand = exports.defaults = exports.filter = exports.GLOBSTAR = exports.sep = exports.minimatch = void 0;
-const brace_expansion_1 = __importDefault(__nccwpck_require__(4507));
-const assert_valid_pattern_js_1 = __nccwpck_require__(6177);
-const ast_js_1 = __nccwpck_require__(2275);
-const escape_js_1 = __nccwpck_require__(2600);
-const unescape_js_1 = __nccwpck_require__(8075);
+const brace_expansion_1 = __importDefault(__nccwpck_require__(4691));
+const assert_valid_pattern_js_1 = __nccwpck_require__(7305);
+const ast_js_1 = __nccwpck_require__(1803);
+const escape_js_1 = __nccwpck_require__(800);
+const unescape_js_1 = __nccwpck_require__(851);
 const minimatch = (p, pattern, options = {}) => {
     (0, assert_valid_pattern_js_1.assertValidPattern)(pattern);
     // shortcut: comments match nothing.
@@ -76568,11 +77654,11 @@ class Minimatch {
 }
 exports.Minimatch = Minimatch;
 /* c8 ignore start */
-var ast_js_2 = __nccwpck_require__(2275);
+var ast_js_2 = __nccwpck_require__(1803);
 Object.defineProperty(exports, "AST", ({ enumerable: true, get: function () { return ast_js_2.AST; } }));
-var escape_js_2 = __nccwpck_require__(2600);
+var escape_js_2 = __nccwpck_require__(800);
 Object.defineProperty(exports, "escape", ({ enumerable: true, get: function () { return escape_js_2.escape; } }));
-var unescape_js_2 = __nccwpck_require__(8075);
+var unescape_js_2 = __nccwpck_require__(851);
 Object.defineProperty(exports, "unescape", ({ enumerable: true, get: function () { return unescape_js_2.unescape; } }));
 /* c8 ignore stop */
 exports.minimatch.AST = ast_js_1.AST;
@@ -76583,7 +77669,7 @@ exports.minimatch.unescape = unescape_js_1.unescape;
 
 /***/ }),
 
-/***/ 8075:
+/***/ 851:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -79816,21 +80902,26 @@ class Stack {
 /**
  * Default export, the thing you're using this module to get.
  *
- * All properties from the options object (with the exception of
- * {@link OptionsBase.max} and {@link OptionsBase.maxSize}) are added as
- * normal public members. (`max` and `maxBase` are read-only getters.)
- * Changing any of these will alter the defaults for subsequent method calls,
- * but is otherwise safe.
+ * The `K` and `V` types define the key and value types, respectively. The
+ * optional `FC` type defines the type of the `context` object passed to
+ * `cache.fetch()` and `cache.memo()`.
+ *
+ * Keys and values **must not** be `null` or `undefined`.
+ *
+ * All properties from the options object (with the exception of `max`,
+ * `maxSize`, `fetchMethod`, `memoMethod`, `dispose` and `disposeAfter`) are
+ * added as normal public members. (The listed options are read-only getters.)
+ *
+ * Changing any of these will alter the defaults for subsequent method calls.
  */
 class LRUCache {
-    // properties coming in from the options of these, only max and maxSize
-    // really *need* to be protected. The rest can be modified, as they just
-    // set defaults for various methods.
+    // options that cannot be changed without disaster
     #max;
     #maxSize;
     #dispose;
     #disposeAfter;
     #fetchMethod;
+    #memoMethod;
     /**
      * {@link LRUCache.OptionsBase.ttl}
      */
@@ -79976,6 +81067,9 @@ class LRUCache {
     get fetchMethod() {
         return this.#fetchMethod;
     }
+    get memoMethod() {
+        return this.#memoMethod;
+    }
     /**
      * {@link LRUCache.OptionsBase.dispose} (read-only)
      */
@@ -79989,7 +81083,7 @@ class LRUCache {
         return this.#disposeAfter;
     }
     constructor(options) {
-        const { max = 0, ttl, ttlResolution = 1, ttlAutopurge, updateAgeOnGet, updateAgeOnHas, allowStale, dispose, disposeAfter, noDisposeOnSet, noUpdateTTL, maxSize = 0, maxEntrySize = 0, sizeCalculation, fetchMethod, noDeleteOnFetchRejection, noDeleteOnStaleGet, allowStaleOnFetchRejection, allowStaleOnFetchAbort, ignoreFetchAbort, } = options;
+        const { max = 0, ttl, ttlResolution = 1, ttlAutopurge, updateAgeOnGet, updateAgeOnHas, allowStale, dispose, disposeAfter, noDisposeOnSet, noUpdateTTL, maxSize = 0, maxEntrySize = 0, sizeCalculation, fetchMethod, memoMethod, noDeleteOnFetchRejection, noDeleteOnStaleGet, allowStaleOnFetchRejection, allowStaleOnFetchAbort, ignoreFetchAbort, } = options;
         if (max !== 0 && !isPosInt(max)) {
             throw new TypeError('max option must be a nonnegative integer');
         }
@@ -80009,6 +81103,11 @@ class LRUCache {
                 throw new TypeError('sizeCalculation set to non-function');
             }
         }
+        if (memoMethod !== undefined &&
+            typeof memoMethod !== 'function') {
+            throw new TypeError('memoMethod must be a function if defined');
+        }
+        this.#memoMethod = memoMethod;
         if (fetchMethod !== undefined &&
             typeof fetchMethod !== 'function') {
             throw new TypeError('fetchMethod must be a function if specified');
@@ -80087,7 +81186,8 @@ class LRUCache {
         }
     }
     /**
-     * Return the remaining TTL time for a given entry key
+     * Return the number of ms left in the item's TTL. If item is not in cache,
+     * returns `0`. Returns `Infinity` if item is in cache without a defined TTL.
      */
     getRemainingTTL(key) {
         return this.#keyMap.has(key) ? Infinity : 0;
@@ -80103,7 +81203,7 @@ class LRUCache {
             if (ttl !== 0 && this.ttlAutopurge) {
                 const t = setTimeout(() => {
                     if (this.#isStale(index)) {
-                        this.delete(this.#keyList[index]);
+                        this.#delete(this.#keyList[index], 'expire');
                     }
                 }, ttl + 1);
                 // unref() not supported on all platforms
@@ -80360,13 +81460,14 @@ class LRUCache {
         return this.entries();
     }
     /**
-     * A String value that is used in the creation of the default string description of an object.
-     * Called by the built-in method Object.prototype.toString.
+     * A String value that is used in the creation of the default string
+     * description of an object. Called by the built-in method
+     * `Object.prototype.toString`.
      */
     [Symbol.toStringTag] = 'LRUCache';
     /**
      * Find a value for which the supplied fn method returns a truthy value,
-     * similar to Array.find().  fn is called as fn(value, key, cache).
+     * similar to `Array.find()`. fn is called as `fn(value, key, cache)`.
      */
     find(fn, getOptions = {}) {
         for (const i of this.#indexes()) {
@@ -80382,10 +81483,15 @@ class LRUCache {
         }
     }
     /**
-     * Call the supplied function on each item in the cache, in order from
-     * most recently used to least recently used.  fn is called as
-     * fn(value, key, cache).  Does not update age or recenty of use.
-     * Does not iterate over stale values.
+     * Call the supplied function on each item in the cache, in order from most
+     * recently used to least recently used.
+     *
+     * `fn` is called as `fn(value, key, cache)`.
+     *
+     * If `thisp` is provided, function will be called in the `this`-context of
+     * the provided object, or the cache if no `thisp` object is provided.
+     *
+     * Does not update age or recenty of use, or iterate over stale values.
      */
     forEach(fn, thisp = this) {
         for (const i of this.#indexes()) {
@@ -80421,7 +81527,7 @@ class LRUCache {
         let deleted = false;
         for (const i of this.#rindexes({ allowStale: true })) {
             if (this.#isStale(i)) {
-                this.delete(this.#keyList[i]);
+                this.#delete(this.#keyList[i], 'expire');
                 deleted = true;
             }
         }
@@ -80429,9 +81535,15 @@ class LRUCache {
     }
     /**
      * Get the extended info about a given entry, to get its value, size, and
-     * TTL info simultaneously. Like {@link LRUCache#dump}, but just for a
-     * single key. Always returns stale values, if their info is found in the
-     * cache, so be sure to check for expired TTLs if relevant.
+     * TTL info simultaneously. Returns `undefined` if the key is not present.
+     *
+     * Unlike {@link LRUCache#dump}, which is designed to be portable and survive
+     * serialization, the `start` value is always the current timestamp, and the
+     * `ttl` is a calculated remaining time to live (negative if expired).
+     *
+     * Always returns stale values, if their info is found in the cache, so be
+     * sure to check for expirations (ie, a negative {@link LRUCache.Entry#ttl})
+     * if relevant.
      */
     info(key) {
         const i = this.#keyMap.get(key);
@@ -80460,7 +81572,16 @@ class LRUCache {
     }
     /**
      * Return an array of [key, {@link LRUCache.Entry}] tuples which can be
-     * passed to cache.load()
+     * passed to {@link LRLUCache#load}.
+     *
+     * The `start` fields are calculated relative to a portable `Date.now()`
+     * timestamp, even if `performance.now()` is available.
+     *
+     * Stale entries are always included in the `dump`, even if
+     * {@link LRUCache.OptionsBase.allowStale} is false.
+     *
+     * Note: this returns an actual array, not a generator, so it can be more
+     * easily passed around.
      */
     dump() {
         const arr = [];
@@ -80489,8 +81610,12 @@ class LRUCache {
     }
     /**
      * Reset the cache and load in the items in entries in the order listed.
-     * Note that the shape of the resulting cache may be different if the
-     * same options are not used in both caches.
+     *
+     * The shape of the resulting cache may be different if the same options are
+     * not used in both caches.
+     *
+     * The `start` fields are assumed to be calculated relative to a portable
+     * `Date.now()` timestamp, even if `performance.now()` is available.
      */
     load(arr) {
         this.clear();
@@ -80513,6 +81638,30 @@ class LRUCache {
      *
      * Note: if `undefined` is specified as a value, this is an alias for
      * {@link LRUCache#delete}
+     *
+     * Fields on the {@link LRUCache.SetOptions} options param will override
+     * their corresponding values in the constructor options for the scope
+     * of this single `set()` operation.
+     *
+     * If `start` is provided, then that will set the effective start
+     * time for the TTL calculation. Note that this must be a previous
+     * value of `performance.now()` if supported, or a previous value of
+     * `Date.now()` if not.
+     *
+     * Options object may also include `size`, which will prevent
+     * calling the `sizeCalculation` function and just use the specified
+     * number if it is a positive integer, and `noDisposeOnSet` which
+     * will prevent calling a `dispose` function in the case of
+     * overwrites.
+     *
+     * If the `size` (or return value of `sizeCalculation`) for a given
+     * entry is greater than `maxEntrySize`, then the item will not be
+     * added to the cache.
+     *
+     * Will update the recency of the entry.
+     *
+     * If the value is `undefined`, then this is an alias for
+     * `cache.delete(key)`. `undefined` is never stored in the cache.
      */
     set(k, v, setOptions = {}) {
         if (v === undefined) {
@@ -80530,7 +81679,7 @@ class LRUCache {
                 status.maxEntrySizeExceeded = true;
             }
             // have to delete, in case something is there already.
-            this.delete(k);
+            this.#delete(k, 'set');
             return this;
         }
         let index = this.#size === 0 ? undefined : this.#keyMap.get(k);
@@ -80682,6 +81831,14 @@ class LRUCache {
      * Will return false if the item is stale, even though it is technically
      * in the cache.
      *
+     * Check if a key is in the cache, without updating the recency of
+     * use. Age is updated if {@link LRUCache.OptionsBase.updateAgeOnHas} is set
+     * to `true` in either the options or the constructor.
+     *
+     * Will return `false` if the item is stale, even though it is technically in
+     * the cache. The difference can be determined (if it matters) by using a
+     * `status` argument, and inspecting the `has` field.
+     *
      * Will not update item age unless
      * {@link LRUCache.OptionsBase.updateAgeOnHas} is set.
      */
@@ -80773,7 +81930,7 @@ class LRUCache {
                         this.#valList[index] = bf.__staleWhileFetching;
                     }
                     else {
-                        this.delete(k);
+                        this.#delete(k, 'fetch');
                     }
                 }
                 else {
@@ -80802,7 +81959,7 @@ class LRUCache {
                 // the stale value is not removed from the cache when the fetch fails.
                 const del = !noDelete || bf.__staleWhileFetching === undefined;
                 if (del) {
-                    this.delete(k);
+                    this.#delete(k, 'fetch');
                 }
                 else if (!allowStaleAborted) {
                     // still replace the *promise* with the stale value,
@@ -80948,6 +82105,28 @@ class LRUCache {
             return staleVal ? p.__staleWhileFetching : (p.__returned = p);
         }
     }
+    async forceFetch(k, fetchOptions = {}) {
+        const v = await this.fetch(k, fetchOptions);
+        if (v === undefined)
+            throw new Error('fetch() returned undefined');
+        return v;
+    }
+    memo(k, memoOptions = {}) {
+        const memoMethod = this.#memoMethod;
+        if (!memoMethod) {
+            throw new Error('no memoMethod provided to constructor');
+        }
+        const { context, forceRefresh, ...options } = memoOptions;
+        const v = this.get(k, options);
+        if (!forceRefresh && v !== undefined)
+            return v;
+        const vv = memoMethod(k, v, {
+            options,
+            context,
+        });
+        this.set(k, vv, options);
+        return vv;
+    }
     /**
      * Return a value from the cache. Will update the recency of the cache
      * entry found.
@@ -80968,7 +82147,7 @@ class LRUCache {
                 // delete only if not an in-flight background fetch
                 if (!fetching) {
                     if (!noDeleteOnStaleGet) {
-                        this.delete(k);
+                        this.#delete(k, 'expire');
                     }
                     if (status && allowStale)
                         status.returnedStale = true;
@@ -81031,16 +82210,20 @@ class LRUCache {
     }
     /**
      * Deletes a key out of the cache.
+     *
      * Returns true if the key was deleted, false otherwise.
      */
     delete(k) {
+        return this.#delete(k, 'delete');
+    }
+    #delete(k, reason) {
         let deleted = false;
         if (this.#size !== 0) {
             const index = this.#keyMap.get(k);
             if (index !== undefined) {
                 deleted = true;
                 if (this.#size === 1) {
-                    this.clear();
+                    this.#clear(reason);
                 }
                 else {
                     this.#removeItemSize(index);
@@ -81050,10 +82233,10 @@ class LRUCache {
                     }
                     else if (this.#hasDispose || this.#hasDisposeAfter) {
                         if (this.#hasDispose) {
-                            this.#dispose?.(v, k, 'delete');
+                            this.#dispose?.(v, k, reason);
                         }
                         if (this.#hasDisposeAfter) {
-                            this.#disposed?.push([v, k, 'delete']);
+                            this.#disposed?.push([v, k, reason]);
                         }
                     }
                     this.#keyMap.delete(k);
@@ -81089,6 +82272,9 @@ class LRUCache {
      * Clear the cache entirely, throwing away all values.
      */
     clear() {
+        return this.#clear('delete');
+    }
+    #clear(reason) {
         for (const index of this.#rindexes({ allowStale: true })) {
             const v = this.#valList[index];
             if (this.#isBackgroundFetch(v)) {
@@ -81097,10 +82283,10 @@ class LRUCache {
             else {
                 const k = this.#keyList[index];
                 if (this.#hasDispose) {
-                    this.#dispose?.(v, k, 'delete');
+                    this.#dispose?.(v, k, reason);
                 }
                 if (this.#hasDisposeAfter) {
-                    this.#disposed?.push([v, k, 'delete']);
+                    this.#disposed?.push([v, k, reason]);
                 }
             }
         }
